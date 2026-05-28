@@ -1491,22 +1491,32 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                     {mobileStep === "dados" ? "Dados do pedido" : mobileStep === "produtos" ? "Produtos" : "Pagamento"}
                   </h3>
                   {/* Inline progress indicator */}
-                  <div className="gap-1 mt-1 flex items-center justify-start my-[45px] mb-[4px] py-0">
-                    {(["dados", "produtos", "pagamento"] as const).map((s, idx) => {
+                  <div className="gap-1 mt-1 flex items-center justify-start mb-1 py-0">
+                    {([
+                      { key: "dados", label: "Dados" },
+                      { key: "produtos", label: "Produtos" },
+                      { key: "pagamento", label: "Pagamento" },
+                    ] as const).map(({ key, label }, idx) => {
                       const currentIdx = (["dados", "produtos", "pagamento"] as const).indexOf(mobileStep);
-                      const active = mobileStep === s;
+                      const active = mobileStep === key;
                       const done = currentIdx > idx;
                       return (
                         <button
-                          key={s}
+                          key={key}
                           type="button"
-                          onClick={() => setMobileStep(s)}
+                          onClick={() => setMobileStep(key)}
                           className={cn(
-                            "h-1 flex-1 rounded-full transition-colors",
-                            active ? "bg-primary" : done ? "bg-primary/60" : "bg-muted"
+                            "h-5 flex-1 rounded-full text-[10px] font-semibold leading-none transition-colors px-1",
+                            active
+                              ? "bg-primary text-primary-foreground"
+                              : done
+                              ? "bg-primary/60 text-primary-foreground"
+                              : "bg-muted text-muted-foreground"
                           )}
-                          aria-label={`Etapa ${s}`}
-                        />
+                          aria-label={`Etapa ${label}`}
+                        >
+                          {label}
+                        </button>
                       );
                     })}
                   </div>
