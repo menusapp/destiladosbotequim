@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+// Tabs removed — order type now uses pill buttons in header
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -1367,91 +1367,23 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                   })}
               </div>
             ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 [&>div]:min-h-24">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
               {tables?.map(table => {
-                const isOccupied = table.is_occupied;
-                const comandaCount = table.comandas?.length || 0;
-                const isSelected = selectedTableId === table.id;
-                const occupiedSince = table.occupied_at ? format(new Date(table.occupied_at), "HH:mm") : null;
+                const active = activeByTable.get(table.id);
                 return (
-                  <Card
+                  <TableCardMobile
                     key={table.id}
-                    className={`${table.is_hidden ? "opacity-60 cursor-not-allowed" : "cursor-pointer"} transition-all hover:shadow-md relative ${
-                      isSelected ? "ring-2 ring-primary border-primary" :
-                      table.is_hidden ? "border-border bg-muted/30" :
-                      isOccupied ? "border-red-300 bg-red-50 dark:bg-red-950/20" : "border-green-300 bg-green-50 dark:bg-green-950/20"
-                    }`}
+                    table={table}
+                    isSelected={selectedTableId === table.id}
+                    pendingCount={pendingByTable.get(table.id) || 0}
+                    itemCount={active?.itemCount || 0}
+                    reservationTime={reservationByTable.get(table.id)?.reservation_time || null}
                     onClick={() => !table.is_hidden && handleTableClick(table)}
-                    onDoubleClick={() => !table.is_hidden && handleTableSelect(table)}
-                  >
-                    {/* Three-dot menu */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 z-10"
-                          onClick={(e) => e.stopPropagation()}>
-                          <MoreVertical className="w-3.5 h-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenuItem onClick={() => handleShowQR(table)}>
-                          <QrCode className="w-4 h-4 mr-2" /> QR Code
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleCopyLink(table)}>
-                          <Link2 className="w-4 h-4 mr-2" /> Copiar Link
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleToggleHidden(table)}>
-                          {table.is_hidden ? <Eye className="w-4 h-4 mr-2" /> : <EyeOff className="w-4 h-4 mr-2" />}
-                          {table.is_hidden ? "Tornar Visível" : "Ocultar Mesa"}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleClearTable(table)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Eraser className="w-4 h-4 mr-2" /> Limpar Mesa
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    <CardContent className="p-4 text-center space-y-1">
-                      <div className={`w-10 h-10 rounded-full mx-auto flex items-center justify-center text-white text-sm font-bold ${
-                        table.is_hidden ? "bg-muted-foreground/40" :
-                        isOccupied ? "bg-red-500" : "bg-green-400"
-                      }`}>
-                        {table.table_number}
-                      </div>
-                      <p className="text-xs font-medium">{table.table_name || `Mesa ${table.table_number}`}</p>
-                      {(pendingByTable.get(table.id) || 0) > 0 && (
-                        <Badge variant="destructive" className="text-[10px] animate-pulse">
-                          🔔 Pedido Novo
-                        </Badge>
-                      )}
-                      {!isOccupied && reservationByTable.has(table.id) && (
-                        <Badge className="text-[10px] bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-100">
-                          🕐 Reservado {reservationByTable.get(table.id)!.reservation_time?.slice(0, 5)}
-                        </Badge>
-                      )}
-                      <Badge variant={table.is_hidden ? "outline" : isOccupied ? "default" : "secondary"} className="text-[10px]">
-                        {table.is_hidden ? "Oculta" : isOccupied ? `${comandaCount} comanda${comandaCount !== 1 ? "s" : ""}` : "Livre"}
-                      </Badge>
-                      {isOccupied && occupiedSince && showPrepTimer && (
-                        <p className="text-[10px] text-muted-foreground">Desde {occupiedSince}</p>
-                      )}
-                      {isOccupied && table.comandas && table.comandas.length > 0 && (
-                        <div className="text-[10px] text-muted-foreground truncate">
-                          {table.comandas.map(c => c.customer_name).join(", ")}
-                        </div>
-                      )}
-                      {(() => {
-                        const active = activeByTable.get(table.id);
-                        if (!active || active.itemCount === 0) return null;
-                        return (
-                          <p className="text-[10px] text-muted-foreground">
-                            📋 {active.itemCount} ite{active.itemCount !== 1 ? "ns" : "m"}
-                          </p>
-                        );
-                      })()}
-                    </CardContent>
-                  </Card>
+                    onShowQR={() => handleShowQR(table)}
+                    onCopyLink={() => handleCopyLink(table)}
+                    onToggleHidden={() => handleToggleHidden(table)}
+                    onClearTable={() => handleClearTable(table)}
+                  />
                 );
               })}
             </div>
@@ -1551,32 +1483,71 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-2 mb-4">
-              <h3 className="font-bold text-lg">Novo Pedido</h3>
-              <div className="flex items-center gap-1">
+            <div className="shrink-0 mb-3">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <h3 className="font-bold text-base">Novo Pedido</h3>
                 {cart.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={clearForm} className="text-xs text-muted-foreground">
+                  <Button variant="ghost" size="sm" onClick={clearForm} className="text-xs text-muted-foreground h-7 px-2">
                     Limpar
                   </Button>
                 )}
+              </div>
+
+              {/* Order type pills */}
+              <div className="grid grid-cols-3 gap-0.5 p-0.5 bg-muted rounded-md mb-1.5" data-tour="pdv-order-type">
+                {(["mesa", "delivery", "retirada"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setOrderType(t)}
+                    className={cn(
+                      "h-7 rounded text-xs font-semibold transition-all capitalize leading-none",
+                      orderType === t
+                        ? "bg-background shadow-sm text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {t === "mesa" ? "Mesa" : t === "delivery" ? "Delivery" : "Retirada"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Steps indicator */}
+              <div className="flex items-center gap-1">
+                {([
+                  { key: "dados", label: "Dados" },
+                  { key: "produtos", label: "Produtos" },
+                  { key: "pagamento", label: "Pagamento" },
+                ] as const).map(({ key, label }, idx) => {
+                  const currentIdx = (["dados", "produtos", "pagamento"] as const).indexOf(mobileStep);
+                  const active = mobileStep === key;
+                  const done = currentIdx > idx;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setMobileStep(key)}
+                      className={cn(
+                        "h-5 flex-1 rounded-full font-semibold leading-none transition-colors px-1 flex items-center justify-center text-[11px]",
+                        active
+                          ? "bg-primary text-primary-foreground"
+                          : done
+                          ? "bg-primary/60 text-primary-foreground"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
           <ScrollArea className={cn("flex-1 min-h-0", isMobile && "-mx-1")}>
             <div className={cn("space-y-5", isMobile ? "px-1 pb-2" : "pr-3")}>
-              {/* Order type tabs — desktop only (mobile uses header pills) */}
-              <Tabs value={orderType} onValueChange={(v) => setOrderType(v as any)} data-tour="pdv-order-type" className={cn(isMobile && "hidden")}>
-                <TabsList className="w-full grid grid-cols-3">
-                  <TabsTrigger value="mesa" className="text-xs">Mesa</TabsTrigger>
-                  <TabsTrigger value="delivery" className="text-xs">Delivery</TabsTrigger>
-                  <TabsTrigger value="retirada" className="text-xs">Retirada</TabsTrigger>
-
-                </TabsList>
-              </Tabs>
-
               {/* Customer Section — Inline Fields */}
-              <div className={cn("border rounded-lg bg-muted/30", isMobile ? "p-3" : "p-4", isMobile && mobileStep !== "dados" && "hidden")} data-tour="pdv-customer">
+              <div className={cn("border rounded-lg bg-muted/30", isMobile ? "p-3" : "p-4", mobileStep !== "dados" && "hidden")} data-tour="pdv-customer">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm font-medium text-muted-foreground">Cliente</p>
                   {(customerName || customerCpf || customerPhone) && (
@@ -1651,7 +1622,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
               {/* Delivery Address Section */}
               {orderType === "delivery" && (
-                <div className={cn("border rounded-lg bg-muted/30", isMobile ? "p-3" : "p-4", isMobile && mobileStep !== "dados" && "hidden")}>
+                <div className={cn("border rounded-lg bg-muted/30", isMobile ? "p-3" : "p-4", mobileStep !== "dados" && "hidden")}>
                   <p className="text-sm font-medium text-muted-foreground mb-3">Endereço de Entrega</p>
 
                   {/* No customer data at all */}
@@ -1749,7 +1720,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
               {/* Mesa selector */}
               {orderType === "mesa" && (
-                <div className={cn("space-y-3", isMobile && mobileStep !== "dados" && "hidden")}>
+                <div className={cn("space-y-3", mobileStep !== "dados" && "hidden")}>
                   <Label className="text-xs font-semibold mb-1.5 block">Mesa</Label>
                   <Select value={selectedTableId} onValueChange={setSelectedTableId}>
                     <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Selecione uma mesa" /></SelectTrigger>
@@ -1765,13 +1736,13 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               )}
 
               {/* Notes */}
-              <div className={cn("space-y-1.5", isMobile && mobileStep !== "dados" && "hidden")}>
+              <div className={cn("space-y-1.5", mobileStep !== "dados" && "hidden")}>
                 <Label className="text-xs font-semibold mb-1.5 block">Observações</Label>
                 <Textarea placeholder="Observações..." value={notes} onChange={e => setNotes(e.target.value)} className="min-h-[50px] text-sm" />
               </div>
 
               {/* Payment */}
-              <div className={cn("space-y-1.5", isMobile && mobileStep !== "pagamento" && "hidden")}>
+              <div className={cn("space-y-1.5", mobileStep !== "pagamento" && "hidden")}>
                 <Label className="text-xs font-semibold mb-1.5 block">Pagamento</Label>
                 <Select value={paymentType} onValueChange={(v) => setPaymentType(v)}>
                   <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Método de pagamento" /></SelectTrigger>
@@ -1881,7 +1852,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
               {/* Discount Section */}
               {cart.length > 0 && (
-                <Collapsible open={discountExpanded} onOpenChange={setDiscountExpanded} className={cn(isMobile && mobileStep !== "pagamento" && "hidden")}>
+                <Collapsible open={discountExpanded} onOpenChange={setDiscountExpanded} className={cn(mobileStep !== "pagamento" && "hidden")}>
                   <div className="border rounded-lg p-4 bg-muted/30">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-muted-foreground">Desconto</p>
@@ -1956,7 +1927,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               )}
 
 
-              <div className={cn("space-y-3", isMobile && mobileStep !== "produtos" && "hidden")} data-tour="pdv-products">
+              <div className={cn("space-y-3", mobileStep !== "produtos" && "hidden")} data-tour="pdv-products">
                 <Label className={cn("text-xs font-semibold mb-1.5 block", isMobile && "hidden")}>Produtos</Label>
                 <div className="relative">
                   <Search className={cn("absolute top-1/2 -translate-y-1/2 text-muted-foreground", isMobile ? "left-3 w-4 h-4" : "left-2.5 w-3.5 h-3.5")} />
@@ -2137,7 +2108,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
               {/* Cart Summary */}
               {cart.length > 0 && (
-                <div className={cn("space-y-2 border-t pt-4", isMobile && mobileStep !== "pagamento" && "hidden")}>
+                <div className={cn("space-y-2 border-t pt-4", mobileStep !== "pagamento" && "hidden")}>
                   <h4 className="font-semibold text-sm flex items-center gap-1.5">
                     <ShoppingCart className="w-4 h-4" /> Carrinho ({cart.length})
                   </h4>
@@ -2188,19 +2159,52 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
             </div>
           </ScrollArea>
 
-          {/* Footer — desktop */}
+          {/* Footer — desktop step-aware */}
           {!isMobile && (
-            <div className="border-t pt-3 mt-2 flex items-center justify-between">
-              <div className="text-xs flex items-center gap-2">
+            <div className="border-t pt-3 mt-2 flex items-center gap-2">
+              {mobileStep !== "dados" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMobileStep(mobileStep === "pagamento" ? "produtos" : "dados")}
+                >
+                  ← Voltar
+                </Button>
+              )}
+              <div className="flex-1 text-xs flex items-center gap-2">
+                <ShoppingCart className="w-3.5 h-3.5 inline" />
                 <span>
-                  <ShoppingCart className="w-3.5 h-3.5 inline mr-1" />
                   {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartTotal.toFixed(2)}</span>
                 </span>
               </div>
-              <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0 || !customerName.trim()} data-tour="pdv-confirm">
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-                Criar Pedido
-              </Button>
+              {mobileStep === "pagamento" ? (
+                <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0 || !customerName.trim()} data-tour="pdv-confirm">
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                  Criar Pedido
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (mobileStep === "dados") {
+                      if (orderType === "mesa" && !selectedTableId) {
+                        toast.error("Selecione uma mesa");
+                        return;
+                      }
+                      if (orderType === "delivery" && !deliveryAddress.trim()) {
+                        toast.error("Informe o endereço de entrega");
+                        return;
+                      }
+                      setMobileStep("produtos");
+                    } else {
+                      setMobileStep("pagamento");
+                    }
+                  }}
+                  disabled={mobileStep === "produtos" && cart.length === 0}
+                >
+                  Próximo →
+                </Button>
+              )}
             </div>
           )}
 
