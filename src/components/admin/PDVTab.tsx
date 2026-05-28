@@ -185,12 +185,12 @@ const findMatchingDeliveryZone = ({
 
 const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, onTableOpened, showPrepTimer = true }: PDVTabProps) => {
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
+  const confirm = useConfirmDialog();
   const [mobileOrderPanelOpen, setMobileOrderPanelOpen] = useState(false);
   const [mobileTableFilter, setMobileTableFilter] = useState<import("./pdv/mobile/TableFilterChips").TableFilter>("all");
   const [mobileStep, setMobileStep] = useState<"produtos" | "dados" | "pagamento">("produtos");
   const [mobileCategoryFilter, setMobileCategoryFilter] = useState<string>("all");
-  const [mobileOrderPanelOpen, setMobileOrderPanelOpen] = useState(false);
-  const [mobileTableFilter, setMobileTableFilter] = useState<import("./pdv/mobile/TableFilterChips").TableFilter>("all");
 
   // Order creation state
   const [orderType, setOrderType] = useState<"mesa" | "delivery" | "retirada">("mesa");
