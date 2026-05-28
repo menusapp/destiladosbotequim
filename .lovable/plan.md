@@ -1,122 +1,63 @@
-# Redesign PDV Mobile — Velocidade do Garçom
 
-Foco: **menos toques, mais legibilidade, gestos modernos**. Mantemos as tabs no topo (Mesas / Delivery / Balcão / Pedidos) e refazemos toda a experiência dentro de cada uma para mobile. Desktop fica intocado.
+## O que muda no PDV mobile
 
-## Princípios (estilo Anota Aí / Goomer 2026)
+Tudo em `src/components/admin/PDVTab.tsx`. Desktop intocado.
 
-- **Alvos de toque ≥ 56px**, tipografia 16-18px nos dados críticos (valor, mesa, item).
-- **1 ação primária por tela**, sempre na faixa do polegar (bottom).
-- **Bottom sheets** em vez de modais empilhados — fecham com swipe.
-- **Feedback háptico/visual** em cada toque (scale + cor).
-- **Estado da mesa visível em 1 olhada**: cor + tempo + valor.
+### 1. Inverter a ordem das etapas
 
----
-
-## 1. Lista de Mesas (mobile)
-
-**Hoje:** grid 2 colunas de cards densos, status pequeno, sem valor visível.
-
-**Novo:**
-- Grid 2 colunas, cards de **altura 120px** com:
-  - Número da mesa gigante (32px, bold).
-  - **Bolinha de status colorida** (verde livre, laranja ocupada <30min, vermelho >30min, azul aguardando pagamento).
-  - **Valor aberto** em destaque (R$ XX,XX) quando ocupada.
-  - **Tempo desde a abertura** (ex: "23 min") em chip.
-  - Nº de comandas como badge no canto.
-- **Filtros rápidos** em chips horizontais no topo: Todas / Ocupadas / Livres / Aguardando pagto.
-- **Busca por número de mesa** com teclado numérico ao tocar no ícone de lupa.
-- **Tap simples** = abre a comanda da mesa direto (hoje é duplo clique, confuso no mobile). Long-press = menu de ações (ocultar, transferir).
-- **FAB "Novo pedido balcão"** flutuante (já existe, melhorar visual).
-
-## 2. Adicionar Produtos (bottom sheet do pedido)
-
-**Hoje:** bottom sheet 90vh, busca no topo, categorias em chips, grid 2 colunas de cards pequenos.
-
-**Novo:**
-- **Header pegajoso** com: nome da mesa/cliente + valor total atual + botão fechar.
-- **Busca sempre visível** no topo com placeholder "Buscar produto ou código".
-- **Chips de categoria** horizontais com scroll-snap, categoria ativa com fundo primary.
-- **Cards de produto otimizados pra toque**:
-  - Layout horizontal (imagem 64px à esquerda, nome + preço + botão "+" grande à direita).
-  - Botão **"+" de 48px** já adiciona 1 unidade direto (sem abrir drawer) se o produto **não tem adicionais obrigatórios**.
-  - Se tem adicionais → abre drawer de adicionais.
-  - Quantidade já no carrinho aparece como badge sobreposta no card.
-- **Atalho de últimos vendidos**: chip "🔥 Mais vendidos hoje" no início das categorias.
-- **Recolher catálogo**: ao tocar no carrinho na barra inferior, catálogo recolhe e mostra revisão do pedido.
-
-## 3. Carrinho / Revisão do Pedido
-
-**Hoje:** lista vertical simples no mesmo bottom sheet.
-
-**Novo:**
-- **Barra inferior persistente** dentro do sheet: `[🛒 3 itens]  R$ 47,90  [Revisar →]`.
-- Tela de revisão:
-  - Cada item em card com:
-    - Nome + adicionais em texto menor abaixo.
-    - **Stepper grande** (− qty +) com 44px de toque.
-    - Swipe horizontal para a esquerda → revela botão **Remover** (vermelho).
-    - Tap no card → editar adicionais/observação.
-  - Campo de **observação geral** colapsável.
-  - Resumo: Subtotal / Taxa / Total em fonte grande.
-- **CTA único bottom**: `Enviar para cozinha` (verde, 56px, full-width, sticky).
-
-## 4. Fechamento / Pagamento
-
-**Hoje:** fluxo desktop adaptado, várias seleções pequenas.
-
-**Novo bottom sheet de pagamento:**
-- **Total a pagar** em destaque (40px, centralizado).
-- **Grid 2×3 de formas de pagamento** com ícone + nome (cards de 80px):
-  - Dinheiro 💵 / Pix 📱 / Crédito 💳 / Débito 💳 / Voucher 🎟️ / Outro
-- Ao escolher **Dinheiro**:
-  - Teclado numérico grande customizado (estilo iFood) aparece in-line.
-  - Atalhos de cédula: `[R$ 50] [R$ 100] [R$ 200] [Valor exato]`.
-  - **Troco calculado em tempo real** abaixo (já existe, deixar 28px, verde).
-- **Dividir conta**: botão "Dividir" no header — abre fluxo de split por pessoa ou por valor (já existe, manter, só polir).
-- **CTA bottom**: `Confirmar pagamento` (56px, sticky).
-- Após confirmação → **tela de sucesso** com ✓ animado + opções `[Imprimir] [Nova venda] [Voltar]`.
-
-## 5. Microinterações e padrões transversais
-
-- **Loading states** com skeleton (não spinner) nos cards de mesa e produtos.
-- **Toasts** trocados por **snackbars bottom** com 1 ação (Desfazer remover item, por ex.).
-- **Pull-to-refresh** na lista de mesas.
-- **Vibração curta** (navigator.vibrate(10)) ao adicionar item / confirmar pagamento.
-- **Safe area** respeitada (env(safe-area-inset-bottom)) para botões sticky em iPhone com notch.
-- **Tab bar** do topo: aumentar altura para 52px, ícone + label, indicador animado por baixo.
-
----
-
-## Arquivos afetados (frontend apenas)
+Nova ordem do wizard mobile:
 
 ```text
-src/components/admin/PDVTab.tsx                 // grid de mesas + tab shell mobile
-src/components/admin/PDVProductDrawer.tsx       // drawer de adicionais (polir)
-src/components/admin/CreateOrderDrawer.tsx      // bottom sheet do pedido novo
-src/components/admin/AddItemsToOrderDrawer.tsx  // bottom sheet adicionar itens à comanda
-src/components/admin/TableDetailView.tsx        // revisão/pagamento da mesa (versão mobile)
+1. Dados do pedido   →  2. Produtos   →  3. Pagamento
 ```
 
-**Novos componentes pequenos** (extraídos para manter PDVTab enxuto):
+- Trocar o tipo `mobileStep` para `"dados" | "produtos" | "pagamento"`.
+- Estado inicial vira `"dados"` (atualizar os 3 pontos onde hoje é resetado para `"produtos"`: FAB, clique em mesa e abertura do painel).
+- Atualizar a barra de progresso (linha ~1522) para iterar nessa nova ordem — assim os "passos concluídos" pintam corretamente.
+- Atualizar os botões Voltar/Próximo do rodapé (linhas ~2197 e ~2237):
+  - Voltar: `pagamento → produtos`, `produtos → dados`.
+  - Próximo: `dados → produtos`, `produtos → pagamento`.
+  - Em `pagamento` o botão final continua "Criar pedido".
+- Validação leve no "Próximo" da etapa Dados quando for Mesa (exigir mesa selecionada) e Delivery (exigir endereço básico) — feedback via toast, sem travar o fluxo das outras etapas.
+
+### 2. Header mobile mais baixo (mais espaço para o conteúdo)
+
+Hoje o topo soma ~180px (handle + header + pills Mesa/Delivery/Retirada + barra de progresso + paddings). Vamos reduzir para ~96px:
+
+- **Header título**: altura dos botões cai de `h-10` para `h-9`, título passa para `text-sm`, margem `mb-3 mt-3` → `mb-2 mt-2`.
+- **Pills Mesa/Delivery/Retirada**: altura `h-9` → `h-8`, padding do wrapper `p-1` → `p-0.5`, `mb-3` → `mb-2`, texto `text-xs` mantém, ícone só (sem texto) opcional — manter texto curto.
+- **Barra de progresso**: passa a ficar **na mesma linha** do título (3 traços finos `h-1` à direita do título) em vez de bloco separado. Remove uma linha inteira de altura.
+- **Drag handle**: encolhe `h-1.5` → `h-1` e fica colado no topo (`top-1.5`).
+- Padding do sheet inteiro: usar `pt-2 pb-2 px-3` no mobile em vez do `p-6` padrão do Sheet.
+
+### 3. Layout travado, sem comer borda
+
+- Sheet mobile passa a usar `flex flex-col h-[100dvh]` (ou `h-screen` com `max-h-[100dvh]`) com 3 zonas fixas:
+  ```text
+  ┌─────────────────────────────┐
+  │ HEADER (fixo, ~96px)        │  shrink-0
+  ├─────────────────────────────┤
+  │ CONTEÚDO da etapa atual     │  flex-1 + overflow-y-auto
+  │ (Dados / Produtos / Pgto)   │
+  ├─────────────────────────────┤
+  │ FOOTER ações (fixo, ~64px)  │  shrink-0 + safe-area
+  └─────────────────────────────┘
+  ```
+- Trocar o `ScrollArea` atual por um `<div className="flex-1 overflow-y-auto overscroll-contain px-1">` para o radix scroll-area parar de cortar conteúdo nas bordas.
+- Aplicar `pb-[env(safe-area-inset-bottom)]` no footer e `px-3` consistente no conteúdo (hoje varia entre `pr-3` e `p-4`, causando o "comendo borda").
+- Cards de seção (Cliente, Endereço, Mesa, Observação, Pagamento) no mobile: trocar `p-4` por `p-3` e `rounded-lg` mantém — ganha respiro lateral.
+- Grid de produtos (Etapa 2) mantém o card horizontal já existente — só herda o espaço extra liberado pelo header menor.
+
+### 4. Detalhes finos
+
+- Título dinâmico do header passa a refletir a nova ordem (já é derivado de `mobileStep`, só revisar wording).
+- Manter cor/estilo dos botões "Próximo" e "Criar pedido" como estão (primary).
+- Sem mudanças em lógica de negócio, validações de pagamento, impressão, criação de pedido ou desktop.
+
+### Arquivo afetado
+
 ```text
-src/components/admin/pdv/mobile/TableCardMobile.tsx
-src/components/admin/pdv/mobile/TableFilterChips.tsx
-src/components/admin/pdv/mobile/ProductRowMobile.tsx
-src/components/admin/pdv/mobile/CartReviewSheet.tsx
-src/components/admin/pdv/mobile/PaymentSheet.tsx
-src/components/admin/pdv/mobile/CashKeypad.tsx
+src/components/admin/PDVTab.tsx
 ```
 
-Tudo controlado via `useIsMobile()` — desktop continua exatamente como está.
-
-## O que **não** muda
-
-- Lógica de negócio (pedidos, pagamento, impressão, estoque, comandas).
-- Tabs no topo (Mesas / Delivery / Balcão / Pedidos) — só ganha polimento visual.
-- Auto-print, QZ Tray, integrações.
-
-## Fora de escopo (perguntar depois se quiser)
-
-- Modo offline / fila de sincronização.
-- Tema escuro dedicado pro mobile.
-- Atalhos por gesto entre abas (swipe lateral).
+Nenhum componente novo, nenhuma mudança de backend.
