@@ -1472,27 +1472,83 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           {isMobile && (
             <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1.5 rounded-full bg-muted-foreground/30" />
           )}
-          <div className={`flex items-center justify-between gap-2 ${isMobile ? "mb-3 mt-3" : "mb-4"}`}>
-            <h3 className="font-bold text-lg">Novo Pedido</h3>
-            <div className="flex items-center gap-1">
-              {cart.length > 0 && (
-                <Button variant="ghost" size="sm" onClick={clearForm} className="text-xs text-muted-foreground">
-                  Limpar
-                </Button>
-              )}
-              {isMobile && (
+
+          {isMobile ? (
+            <>
+              {/* Mobile header: close + title + clear */}
+              <div className="flex items-center justify-between gap-2 mb-3 mt-3">
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setMobileOrderPanelOpen(false)}
-                  className="h-11 w-11"
+                  className="h-10 w-10 -ml-2"
                   aria-label="Fechar"
                 >
                   <X className="w-5 h-5" />
                 </Button>
-              )}
+                <h3 className="font-bold text-base flex-1 text-center">
+                  {mobileStep === "produtos" ? "Produtos" : mobileStep === "dados" ? "Dados do pedido" : "Pagamento"}
+                </h3>
+                {cart.length > 0 ? (
+                  <Button variant="ghost" size="sm" onClick={clearForm} className="text-xs text-muted-foreground h-10">
+                    Limpar
+                  </Button>
+                ) : (
+                  <div className="w-10" />
+                )}
+              </div>
+
+              {/* Mobile order type pills */}
+              <div className="grid grid-cols-3 gap-1.5 p-1 bg-muted rounded-xl mb-3">
+                {(["mesa", "delivery", "retirada"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setOrderType(t)}
+                    className={cn(
+                      "h-9 rounded-lg text-xs font-semibold transition-all capitalize",
+                      orderType === t
+                        ? "bg-background shadow text-foreground"
+                        : "text-muted-foreground active:scale-95"
+                    )}
+                  >
+                    {t === "mesa" ? "Mesa" : t === "delivery" ? "Delivery" : "Retirada"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Step indicator */}
+              <div className="flex items-center gap-1.5 mb-3 px-1">
+                {(["produtos", "dados", "pagamento"] as const).map((s, idx) => {
+                  const active = mobileStep === s;
+                  const done = (["produtos", "dados", "pagamento"] as const).indexOf(mobileStep) > idx;
+                  return (
+                    <div key={s} className="flex-1 flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setMobileStep(s)}
+                        className={cn(
+                          "h-1.5 flex-1 rounded-full transition-colors",
+                          active ? "bg-primary" : done ? "bg-primary/60" : "bg-muted"
+                        )}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-between gap-2 mb-4">
+              <h3 className="font-bold text-lg">Novo Pedido</h3>
+              <div className="flex items-center gap-1">
+                {cart.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={clearForm} className="text-xs text-muted-foreground">
+                    Limpar
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           <ScrollArea className="flex-1">
             <div className="space-y-5 pr-3">
