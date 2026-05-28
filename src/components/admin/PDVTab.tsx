@@ -48,6 +48,7 @@ import { normalizeSearch } from "@/lib/searchNormalize";
 import { withProductComplements } from "@/lib/productComplements";
 import { TableCardMobile } from "./pdv/mobile/TableCardMobile";
 import { TableFilterChips } from "./pdv/mobile/TableFilterChips";
+import { cn } from "@/lib/utils";
 
 interface CartItem {
   productId: string;
