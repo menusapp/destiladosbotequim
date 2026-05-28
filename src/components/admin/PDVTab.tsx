@@ -1491,7 +1491,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                     {mobileStep === "dados" ? "Dados do pedido" : mobileStep === "produtos" ? "Produtos" : "Pagamento"}
                   </h3>
                   {/* Inline progress indicator */}
-                  <div className="flex items-center gap-1 mt-1">
+                  <div className="gap-1 mt-1 flex items-center justify-start my-[45px] mb-[4px] py-0">
                     {(["dados", "produtos", "pagamento"] as const).map((s, idx) => {
                       const currentIdx = (["dados", "produtos", "pagamento"] as const).indexOf(mobileStep);
                       const active = mobileStep === s;
