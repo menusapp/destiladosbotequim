@@ -94,9 +94,16 @@ export function useOrderStatusAdvance(restaurantId: string) {
       else if (newStatus === "ready") notificationType = "order_ready_pickup";
       else if (newStatus === "cancelled") notificationType = "order_cancelled";
 
-      if (!notificationType) return;
+      if (!notificationType) {
+        console.log(`[WhatsApp][NOTIF] Status "${newStatus}" sem template mapeado — ignorando.`);
+        return;
+      }
 
-      let phone = order.delivery_phone || null;
+      // Sempre tentar resolver telefone a partir do cadastro do cliente (CPF),
+      // caindo de volta para o telefone do pedido. Isso garante notificação mesmo
+      // quando delivery_phone vier vazio (pickup, balcao, etc).
+      let phone: string | null = order.delivery_phone?.trim() || null;
+
       if (!phone && order.customer_cpf) {
         const { data: customer } = await supabase
           .from("customers")
@@ -104,19 +111,40 @@ export function useOrderStatusAdvance(restaurantId: string) {
           .eq("restaurant_id", restaurantId)
           .eq("cpf", order.customer_cpf)
           .maybeSingle();
-        phone = customer?.phone || null;
+        phone = customer?.phone?.trim() || null;
       }
-      if (!phone) return;
+
+      // Último fallback: buscar pelo nome do cliente neste restaurante
+      if (!phone && order.customer_name) {
+        const { data: customer } = await supabase
+          .from("customers")
+          .select("phone")
+          .eq("restaurant_id", restaurantId)
+          .ilike("name", order.customer_name.trim())
+          .not("phone", "is", null)
+          .limit(1)
+          .maybeSingle();
+        phone = customer?.phone?.trim() || null;
+      }
+
+      if (!phone) {
+        console.warn(
+          `[WhatsApp][NOTIF] Pedido ${order.id.slice(0, 8)} sem telefone — notificação "${notificationType}" não enviada.`
+        );
+        return;
+      }
 
       const { data: restaurant } = await supabase
         .from("restaurants")
         .select("prep_time_minutes, slug")
         .eq("id", restaurantId)
-        .single();
+        .maybeSingle();
 
       const slug = restaurant?.slug || '';
 
-      await supabase.functions.invoke("whatsapp-notifications", {
+      console.log(`[WhatsApp][NOTIF] Disparando ${notificationType} para pedido ${order.id.slice(0, 8)} (phone=${phone})`);
+
+      const invokePromise = supabase.functions.invoke("whatsapp-notifications", {
         body: {
           restaurant_id: restaurantId,
           notification_type: notificationType,
@@ -131,10 +159,25 @@ export function useOrderStatusAdvance(restaurantId: string) {
           },
         },
       });
+
+      // Não bloqueia o fluxo, mas garante que falhas sejam logadas (evita
+      // promise rejections silenciosas que escondiam erros de notificação).
+      invokePromise
+        .then((res) => {
+          if (res.error) {
+            console.error(`[WhatsApp][NOTIF] invoke error (${notificationType}):`, res.error);
+          } else {
+            console.log(`[WhatsApp][NOTIF] invoke ok (${notificationType}):`, res.data);
+          }
+        })
+        .catch((err) => {
+          console.error(`[WhatsApp][NOTIF] invoke threw (${notificationType}):`, err);
+        });
     } catch (error) {
       console.error("[WhatsApp][NOTIF] Erro:", error);
     }
   };
+
 
   const syncDDStatus = async (order: Order, newStatus: string, reason?: string): Promise<{ ok: boolean; errorMsg?: string }> => {
     if (!order.dd_source || !order.dd_order_id) return { ok: true };
