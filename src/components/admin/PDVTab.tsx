@@ -1945,10 +1945,15 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               <div className={cn("space-y-3", isMobile && mobileStep !== "produtos" && "hidden")} data-tour="pdv-products">
                 <Label className={cn("text-xs font-semibold mb-1.5 block", isMobile && "hidden")}>Produtos</Label>
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                  <Input placeholder="Buscar produto..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-8 h-9 text-sm" />
+                  <Search className={cn("absolute top-1/2 -translate-y-1/2 text-muted-foreground", isMobile ? "left-3 w-4 h-4" : "left-2.5 w-3.5 h-3.5")} />
+                  <Input
+                    placeholder={isMobile ? "Buscar produto ou código" : "Buscar produto..."}
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className={cn(isMobile ? "pl-10 h-11 text-sm rounded-xl" : "pl-8 h-9 text-sm")}
+                  />
                 </div>
-                <div className="max-h-[50vh] min-h-[300px] overflow-y-auto pr-1">
+                <div className={cn(isMobile ? "flex-1 overflow-y-auto pr-1" : "max-h-[50vh] min-h-[300px] overflow-y-auto pr-1")}>
                   {(() => {
                     // Group products by category
                     const categoryMap = new Map<string, { name: string; products: typeof filteredProducts }>();
