@@ -2159,19 +2159,52 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
             </div>
           </ScrollArea>
 
-          {/* Footer — desktop */}
+          {/* Footer — desktop step-aware */}
           {!isMobile && (
-            <div className="border-t pt-3 mt-2 flex items-center justify-between">
-              <div className="text-xs flex items-center gap-2">
+            <div className="border-t pt-3 mt-2 flex items-center gap-2">
+              {mobileStep !== "dados" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMobileStep(mobileStep === "pagamento" ? "produtos" : "dados")}
+                >
+                  ← Voltar
+                </Button>
+              )}
+              <div className="flex-1 text-xs flex items-center gap-2">
+                <ShoppingCart className="w-3.5 h-3.5 inline" />
                 <span>
-                  <ShoppingCart className="w-3.5 h-3.5 inline mr-1" />
                   {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartTotal.toFixed(2)}</span>
                 </span>
               </div>
-              <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0 || !customerName.trim()} data-tour="pdv-confirm">
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-                Criar Pedido
-              </Button>
+              {mobileStep === "pagamento" ? (
+                <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0 || !customerName.trim()} data-tour="pdv-confirm">
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                  Criar Pedido
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (mobileStep === "dados") {
+                      if (orderType === "mesa" && !selectedTableId) {
+                        toast.error("Selecione uma mesa");
+                        return;
+                      }
+                      if (orderType === "delivery" && !deliveryAddress.trim()) {
+                        toast.error("Informe o endereço de entrega");
+                        return;
+                      }
+                      setMobileStep("produtos");
+                    } else {
+                      setMobileStep("pagamento");
+                    }
+                  }}
+                  disabled={mobileStep === "produtos" && cart.length === 0}
+                >
+                  Próximo →
+                </Button>
+              )}
             </div>
           )}
 
