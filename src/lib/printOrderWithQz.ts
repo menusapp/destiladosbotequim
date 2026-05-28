@@ -677,17 +677,23 @@ export async function printOrderWithQz(
     const customer = buildCustomerReceipt(order, storeName);
     console.log("📄 Via do CLIENTE preparada.");
 
-    const data: { type: string; format: string; data: string }[] = [
-      { type: "raw", format: "plain", data: customer },
+    // IMPORTANTE: options.encoding="CP850" instrui o QZ Tray a converter o texto
+    // (UTF-8 em JS) para bytes na code page CP850 antes de enviar à impressora.
+    // Combinado com o comando ESC t 2 já embutido no início de cada via, garante
+    // que acentos do português (á é í ó ú â ê ô ã õ ç) sejam impressos corretamente
+    // em vez de virarem símbolos estranhos.
+    const data: { type: string; format: string; data: string; options?: any }[] = [
+      { type: "raw", format: "plain", data: customer, options: { encoding: "CP850" } },
     ];
 
     if (mode === "pedido") {
       const kitchen = buildKitchenReceipt(order);
       console.log("📄 Via da COZINHA preparada.");
-      data.push({ type: "raw", format: "plain", data: kitchen });
+      data.push({ type: "raw", format: "plain", data: kitchen, options: { encoding: "CP850" } });
     } else {
       console.log("ℹ️ Modo 'conta': via da cozinha NÃO será impressa.");
     }
+
 
     const copies = data.length;
     console.log(
