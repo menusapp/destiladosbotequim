@@ -2248,7 +2248,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
       {/* Mobile floating "Novo Pedido" button */}
       {isMobile && !mobileOrderPanelOpen && (
         <Button
-          onClick={() => { setMobileStep("produtos"); setMobileOrderPanelOpen(true); }}
+          onClick={() => { setMobileStep("dados"); setMobileOrderPanelOpen(true); }}
           className="fixed bottom-24 right-4 z-50 h-14 rounded-full shadow-lg flex items-center gap-2 px-5 md:bottom-4"
           size="lg"
         >
