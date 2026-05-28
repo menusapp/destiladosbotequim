@@ -97,6 +97,13 @@ const GS = "\x1D";
 
 const ESCPOS = {
   INIT: ESC + "@",
+  // Seleciona code page CP850 (Latin-1, com suporte a acentos PT-BR: á é í ó ú â ê ô ã õ ç etc.)
+  // ESC t n  →  n = 2  → PC850 (Multilingual Latin I) na maioria das térmicas ESC/POS.
+  // Combinado com options.encoding="CP850" no qz.print, o QZ Tray converte a string
+  // UTF-8 para bytes CP850 antes de enviar, então os caracteres acentuados saem corretos.
+  CODEPAGE_CP850: ESC + "t" + "\x02",
+  // Seleciona conjunto internacional "Latin American" (ajuda em algumas impressoras antigas).
+  CHARSET_LATIN: ESC + "R" + "\x08",
   ALIGN_LEFT: ESC + "a" + "\x00",
   ALIGN_CENTER: ESC + "a" + "\x01",
   ALIGN_RIGHT: ESC + "a" + "\x02",
@@ -211,6 +218,9 @@ function buildCustomerReceipt(
 ): string {
   let out = "";
   out += ESCPOS.INIT;
+  // Selecionar code page CP850 para imprimir acentos PT-BR corretamente.
+  out += ESCPOS.CODEPAGE_CP850;
+  out += ESCPOS.CHARSET_LATIN;
 
   // ---------- Cabeçalho: nome da loja ----------
   out += ESCPOS.ALIGN_CENTER;
@@ -404,6 +414,10 @@ function buildCustomerReceipt(
 function buildKitchenReceipt(order: OrderForPrinting): string {
   let out = "";
   out += ESCPOS.INIT;
+  // Selecionar code page CP850 para imprimir acentos PT-BR corretamente.
+  out += ESCPOS.CODEPAGE_CP850;
+  out += ESCPOS.CHARSET_LATIN;
+
 
   // ---------- Cabeçalho ----------
   out += ESCPOS.ALIGN_CENTER;
@@ -663,17 +677,23 @@ export async function printOrderWithQz(
     const customer = buildCustomerReceipt(order, storeName);
     console.log("📄 Via do CLIENTE preparada.");
 
-    const data: { type: string; format: string; data: string }[] = [
-      { type: "raw", format: "plain", data: customer },
+    // IMPORTANTE: options.encoding="CP850" instrui o QZ Tray a converter o texto
+    // (UTF-8 em JS) para bytes na code page CP850 antes de enviar à impressora.
+    // Combinado com o comando ESC t 2 já embutido no início de cada via, garante
+    // que acentos do português (á é í ó ú â ê ô ã õ ç) sejam impressos corretamente
+    // em vez de virarem símbolos estranhos.
+    const data: { type: string; format: string; data: string; options?: any }[] = [
+      { type: "raw", format: "plain", data: customer, options: { encoding: "CP850" } },
     ];
 
     if (mode === "pedido") {
       const kitchen = buildKitchenReceipt(order);
       console.log("📄 Via da COZINHA preparada.");
-      data.push({ type: "raw", format: "plain", data: kitchen });
+      data.push({ type: "raw", format: "plain", data: kitchen, options: { encoding: "CP850" } });
     } else {
       console.log("ℹ️ Modo 'conta': via da cozinha NÃO será impressa.");
     }
+
 
     const copies = data.length;
     console.log(
