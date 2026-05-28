@@ -429,12 +429,9 @@ const RestaurantAdmin = () => {
                 console.error('[auto-print] falha ao ler printer_settings:', err);
               }
 
-              // Marcar como notificado (atualizar ref e state)
-              const updated = new Set(notifiedOrdersRef.current);
-              updated.add(orderId);
-              notifiedOrdersRef.current = updated;
-              setNotifiedOrders(updated);
-              localStorage.setItem("notifiedGlobalOrders", JSON.stringify(Array.from(updated)));
+              // Sincronizar state do React (a ref + localStorage já foram atualizados
+              // no início do handler, antes dos awaits, para deduplicar corretamente).
+              setNotifiedOrders(new Set(notifiedOrdersRef.current));
             }
 
             // Atualizar badges da sidebar
