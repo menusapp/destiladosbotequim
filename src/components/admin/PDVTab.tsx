@@ -190,7 +190,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   const confirm = useConfirmDialog();
   const [mobileOrderPanelOpen, setMobileOrderPanelOpen] = useState(false);
   const [mobileTableFilter, setMobileTableFilter] = useState<import("./pdv/mobile/TableFilterChips").TableFilter>("all");
-  const [mobileStep, setMobileStep] = useState<"produtos" | "dados" | "pagamento">("produtos");
+  const [mobileStep, setMobileStep] = useState<"dados" | "produtos" | "pagamento">("dados");
   const [mobileCategoryFilter, setMobileCategoryFilter] = useState<string>("all");
 
   // Order creation state
