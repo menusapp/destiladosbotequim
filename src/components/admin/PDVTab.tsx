@@ -1867,7 +1867,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
               {/* Discount Section */}
               {cart.length > 0 && (
-                <Collapsible open={discountExpanded} onOpenChange={setDiscountExpanded}>
+                <Collapsible open={discountExpanded} onOpenChange={setDiscountExpanded} className={cn(isMobile && mobileStep !== "pagamento" && "hidden")}>
                   <div className="border rounded-lg p-4 bg-muted/30">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium text-muted-foreground">Desconto</p>
