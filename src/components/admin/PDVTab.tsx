@@ -2077,62 +2077,74 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
             </div>
           </ScrollArea>
 
-          {/* Footer */}
-          <div className="border-t pt-3 mt-2 flex items-center justify-between">
-            <div className="text-xs flex items-center gap-2">
-              <span>
-                <ShoppingCart className="w-3.5 h-3.5 inline mr-1" />
-                {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartTotal.toFixed(2)}</span>
-              </span>
-              {cart.length > 0 && (
+          {/* Footer — desktop */}
+          {!isMobile && (
+            <div className="border-t pt-3 mt-2 flex items-center justify-between">
+              <div className="text-xs flex items-center gap-2">
+                <span>
+                  <ShoppingCart className="w-3.5 h-3.5 inline mr-1" />
+                  {cart.length} ite{cart.length !== 1 ? "ns" : "m"} • <span className="font-bold">R$ {cartTotal.toFixed(2)}</span>
+                </span>
+              </div>
+              <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0 || !customerName.trim()} data-tour="pdv-confirm">
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                Criar Pedido
+              </Button>
+            </div>
+          )}
+
+          {/* Footer — mobile step-aware */}
+          {isMobile && (
+            <div className="border-t pt-3 mt-2 pb-[env(safe-area-inset-bottom)] flex items-center gap-2">
+              {/* Back button */}
+              {mobileStep !== "produtos" && (
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0"
-                  title="Copiar resumo do pedido"
-                  onClick={() => {
-                    let text = "📋 *Resumo do Pedido*\n\n";
-                    cart.forEach((item, i) => {
-                      const itemTotal = (item.price + item.extras.reduce((s, e) => s + e.price, 0)) * item.quantity;
-                      text += `${i + 1}. *${item.productName}* x${item.quantity} — R$ ${itemTotal.toFixed(2)}\n`;
-                      if (item.price > 0) text += `   Preço unit.: R$ ${item.price.toFixed(2)}\n`;
-                      if (item.extras.length > 0) {
-                        item.extras.forEach(e => {
-                          text += `   ➕ ${e.name}${e.price > 0 ? ` (+R$ ${e.price.toFixed(2)})` : ""}\n`;
-                        });
-                      }
-                      if (item.notes) text += `   📝 ${item.notes}\n`;
-                      text += "\n";
-                    });
-                    if (calculatedDiscount > 0) {
-                      text += `🏷️ Desconto: -R$ ${calculatedDiscount.toFixed(2)}\n`;
-                    }
-                    if (orderType === "delivery") {
-                      const cityParts = (deliveryCity || "").split(" - ");
-                      const cityName = (selectedAddress?.city || cityParts[0] || matchedZone?.zone_name || "").trim();
-                      const state = (selectedAddress?.state || cityParts[1] || "").trim();
-                      const cityLabel = cityName ? `${cityName}${state ? ` - ${state}` : ""}` : "";
-                      text += `🚚 Taxa de entrega: ${resolvedDeliveryFee > 0 ? `R$ ${resolvedDeliveryFee.toFixed(2)}` : "Grátis"}\n`;
-                      if (deliveryAddress) {
-                        text += `📍 Endereço: ${[cityLabel, deliveryAddress, deliveryNeighborhood || selectedAddress?.neighborhood || "", deliveryCep ? `CEP ${deliveryCep}` : ""].filter(Boolean).join(" - ")}\n`;
-                      }
-                    }
-                    text += `\n💰 *Total: R$ ${cartTotal.toFixed(2)}*`;
-                    if (customerName) text += `\n👤 Cliente: ${customerName}`;
-                    if (customerPhone) text += `\n📱 Tel: ${customerPhone}`;
-                    navigator.clipboard.writeText(text);
-                    toast.success("Resumo copiado!");
-                  }}
+                  variant="outline"
+                  size="lg"
+                  className="h-12 px-4 rounded-xl"
+                  onClick={() => setMobileStep(mobileStep === "pagamento" ? "dados" : "produtos")}
                 >
-                  <ClipboardList className="w-4 h-4" />
+                  ←
+                </Button>
+              )}
+
+              {/* Cart pill */}
+              <div className="flex-1 flex items-center gap-2 h-12 px-3 rounded-xl bg-muted">
+                <ShoppingCart className="w-4 h-4 text-muted-foreground" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] leading-none text-muted-foreground">
+                    {cart.length} ite{cart.length !== 1 ? "ns" : "m"}
+                  </p>
+                  <p className="text-sm font-bold leading-tight truncate">
+                    R$ {cartTotal.toFixed(2).replace(".", ",")}
+                  </p>
+                </div>
+              </div>
+
+              {/* Primary CTA */}
+              {mobileStep === "pagamento" ? (
+                <Button
+                  size="lg"
+                  className="h-12 px-5 rounded-xl font-bold flex-shrink-0"
+                  onClick={handleSubmit}
+                  disabled={submitting || cart.length === 0 || !customerName.trim()}
+                  data-tour="pdv-confirm"
+                >
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                  Criar
+                </Button>
+              ) : (
+                <Button
+                  size="lg"
+                  className="h-12 px-5 rounded-xl font-bold flex-shrink-0"
+                  onClick={() => setMobileStep(mobileStep === "produtos" ? "dados" : "pagamento")}
+                  disabled={cart.length === 0}
+                >
+                  Próximo →
                 </Button>
               )}
             </div>
-            <Button size="sm" onClick={handleSubmit} disabled={submitting || cart.length === 0 || !customerName.trim()} data-tour="pdv-confirm">
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-              Criar Pedido
-            </Button>
-          </div>
+          )}
         </div>
       </div>
 
