@@ -329,6 +329,19 @@ const RestaurantAdmin = () => {
             // Verificar se já foi notificado (usar ref para evitar stale closure)
             if (notifiedOrdersRef.current.has(orderId)) return;
 
+            // CRÍTICO: marcar IMEDIATAMENTE como notificado (antes de qualquer await),
+            // para que eventos realtime duplicados (reconexão de canal, múltiplas abas,
+            // INSERTs repetidos do Postgres) não disparem múltiplas impressões automáticas
+            // para o mesmo pedido. Persistir em localStorage também é feito agora.
+            {
+              const updated = new Set(notifiedOrdersRef.current);
+              updated.add(orderId);
+              notifiedOrdersRef.current = updated;
+              try {
+                localStorage.setItem("notifiedGlobalOrders", JSON.stringify(Array.from(updated)));
+              } catch {}
+            }
+
             // Buscar detalhes completos do pedido para calcular total
             // Delay inicial para garantir que order_items e extras já foram inseridos (race condition)
             await new Promise(r => setTimeout(r, 1500));
