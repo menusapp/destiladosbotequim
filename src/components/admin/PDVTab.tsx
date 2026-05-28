@@ -2026,7 +2026,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
               {/* Cart Summary */}
               {cart.length > 0 && (
-                <div className="space-y-2 border-t pt-4">
+                <div className={cn("space-y-2 border-t pt-4", isMobile && mobileStep !== "pagamento" && "hidden")}>
                   <h4 className="font-semibold text-sm flex items-center gap-1.5">
                     <ShoppingCart className="w-4 h-4" /> Carrinho ({cart.length})
                   </h4>
