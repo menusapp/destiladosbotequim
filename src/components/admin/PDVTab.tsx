@@ -1313,7 +1313,16 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
             <Button variant="outline" size="sm" onClick={() => setIsManageTablesOpen(true)} className="text-xs h-7">
               <Settings className="w-3.5 h-3.5 mr-1" />
               Gerenciar Mesas
+            </Button>
+          </div>
+
           {/* Mobile filter chips */}
+          {isMobile && tables && (
+            <div className="mb-2 flex-shrink-0">
+              <TableFilterChips
+                value={mobileTableFilter}
+                onChange={setMobileTableFilter}
+                counts={{
           {isMobile && tables && (
             <div className="mb-2 flex-shrink-0">
               <TableFilterChips
