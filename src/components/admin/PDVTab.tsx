@@ -1565,7 +1565,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               </Tabs>
 
               {/* Customer Section — Inline Fields */}
-              <div className={cn("border rounded-lg p-4 bg-muted/30", isMobile && mobileStep !== "dados" && "hidden")} data-tour="pdv-customer">
+              <div className={cn("border rounded-lg bg-muted/30", isMobile ? "p-3" : "p-4", isMobile && mobileStep !== "dados" && "hidden")} data-tour="pdv-customer">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm font-medium text-muted-foreground">Cliente</p>
                   {(customerName || customerCpf || customerPhone) && (
@@ -1640,7 +1640,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
               {/* Delivery Address Section */}
               {orderType === "delivery" && (
-                <div className={cn("border rounded-lg p-4 bg-muted/30", isMobile && mobileStep !== "dados" && "hidden")}>
+                <div className={cn("border rounded-lg bg-muted/30", isMobile ? "p-3" : "p-4", isMobile && mobileStep !== "dados" && "hidden")}>
                   <p className="text-sm font-medium text-muted-foreground mb-3">Endereço de Entrega</p>
 
                   {/* No customer data at all */}
