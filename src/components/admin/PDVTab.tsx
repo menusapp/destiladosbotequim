@@ -46,6 +46,8 @@ import {
 } from "@/lib/reservations";
 import { normalizeSearch } from "@/lib/searchNormalize";
 import { withProductComplements } from "@/lib/productComplements";
+import { TableCardMobile } from "./pdv/mobile/TableCardMobile";
+import { TableFilterChips } from "./pdv/mobile/TableFilterChips";
 
 interface CartItem {
   productId: string;
@@ -186,6 +188,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
   const isMobile = useIsMobile();
   const confirm = useConfirmDialog();
   const [mobileOrderPanelOpen, setMobileOrderPanelOpen] = useState(false);
+  const [mobileTableFilter, setMobileTableFilter] = useState<import("./pdv/mobile/TableFilterChips").TableFilter>("all");
 
   // Order creation state
   const [orderType, setOrderType] = useState<"mesa" | "delivery" | "retirada">("mesa");
@@ -1313,8 +1316,54 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
             </Button>
           </div>
 
+          {/* Mobile filter chips */}
+          {isMobile && tables && (
+            <div className="mb-2 flex-shrink-0">
+              <TableFilterChips
+                value={mobileTableFilter}
+                onChange={setMobileTableFilter}
+                counts={{
+                  all: tables.filter(t => !t.is_hidden).length,
+                  occupied: tables.filter(t => !t.is_hidden && t.is_occupied).length,
+                  free: tables.filter(t => !t.is_hidden && !t.is_occupied).length,
+                  pending: tables.filter(t => !t.is_hidden && (pendingByTable.get(t.id) || 0) > 0).length,
+                }}
+              />
+            </div>
+          )}
+
           {/* Tables Grid (scrollable) */}
-          <div className="flex-1 overflow-y-auto pr-1">
+          <div className="flex-1 overflow-y-auto pr-1 pb-24 sm:pb-1">
+            {isMobile ? (
+              <div className="grid grid-cols-2 gap-2.5">
+                {tables
+                  ?.filter(table => {
+                    if (table.is_hidden && mobileTableFilter !== "all") return false;
+                    if (mobileTableFilter === "occupied") return table.is_occupied;
+                    if (mobileTableFilter === "free") return !table.is_occupied;
+                    if (mobileTableFilter === "pending") return (pendingByTable.get(table.id) || 0) > 0;
+                    return true;
+                  })
+                  .map(table => {
+                    const active = activeByTable.get(table.id);
+                    return (
+                      <TableCardMobile
+                        key={table.id}
+                        table={table}
+                        isSelected={selectedTableId === table.id}
+                        pendingCount={pendingByTable.get(table.id) || 0}
+                        itemCount={active?.itemCount || 0}
+                        reservationTime={reservationByTable.get(table.id)?.reservation_time || null}
+                        onClick={() => !table.is_hidden && handleTableClick(table)}
+                        onShowQR={() => handleShowQR(table)}
+                        onCopyLink={() => handleCopyLink(table)}
+                        onToggleHidden={() => handleToggleHidden(table)}
+                        onClearTable={() => handleClearTable(table)}
+                      />
+                    );
+                  })}
+              </div>
+            ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 [&>div]:min-h-24">
               {tables?.map(table => {
                 const isOccupied = table.is_occupied;
@@ -1403,6 +1452,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                 );
               })}
             </div>
+            )}
           </div>
         </div>
 
