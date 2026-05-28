@@ -1735,7 +1735,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
               {/* Mesa selector */}
               {orderType === "mesa" && (
-                <div className="space-y-3">
+                <div className={cn("space-y-3", isMobile && mobileStep !== "dados" && "hidden")}>
                   <Label className="text-xs font-semibold mb-1.5 block">Mesa</Label>
                   <Select value={selectedTableId} onValueChange={setSelectedTableId}>
                     <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Selecione uma mesa" /></SelectTrigger>
@@ -1751,13 +1751,13 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               )}
 
               {/* Notes */}
-              <div className="space-y-1.5">
+              <div className={cn("space-y-1.5", isMobile && mobileStep !== "dados" && "hidden")}>
                 <Label className="text-xs font-semibold mb-1.5 block">Observações</Label>
                 <Textarea placeholder="Observações..." value={notes} onChange={e => setNotes(e.target.value)} className="min-h-[50px] text-sm" />
               </div>
 
               {/* Payment */}
-              <div className="space-y-1.5">
+              <div className={cn("space-y-1.5", isMobile && mobileStep !== "pagamento" && "hidden")}>
                 <Label className="text-xs font-semibold mb-1.5 block">Pagamento</Label>
                 <Select value={paymentType} onValueChange={(v) => setPaymentType(v)}>
                   <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Método de pagamento" /></SelectTrigger>
