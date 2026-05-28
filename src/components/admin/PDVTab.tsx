@@ -1535,7 +1535,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                       type="button"
                       onClick={() => setMobileStep(key)}
                       className={cn(
-                        "h-[14px] flex-1 rounded-full text-[9px] font-semibold leading-none transition-colors px-1 flex items-center justify-center",
+                        "h-[14px] flex-1 rounded-full font-semibold leading-none transition-colors px-1 flex items-center justify-center text-xs",
                         active
                           ? "bg-primary text-primary-foreground"
                           : done
