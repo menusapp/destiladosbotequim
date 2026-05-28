@@ -266,7 +266,7 @@ export function useOrderStatusAdvance(restaurantId: string) {
       if (newStatus === "delivered" || newStatus === "picked_up") {
         supabase.functions.invoke("marketing-trigger", { body: { orderId: order.id, restaurantId } });
 
-        let phone = order.delivery_phone || null;
+        let phone: string | null = order.delivery_phone?.trim() || null;
         if (!phone && order.customer_cpf) {
           const { data: customer } = await supabase
             .from("customers")
@@ -274,11 +274,23 @@ export function useOrderStatusAdvance(restaurantId: string) {
             .eq("restaurant_id", restaurantId)
             .eq("cpf", order.customer_cpf)
             .maybeSingle();
-          phone = customer?.phone || null;
+          phone = customer?.phone?.trim() || null;
+        }
+        if (!phone && order.customer_name) {
+          const { data: customer } = await supabase
+            .from("customers")
+            .select("phone")
+            .eq("restaurant_id", restaurantId)
+            .ilike("name", order.customer_name.trim())
+            .not("phone", "is", null)
+            .limit(1)
+            .maybeSingle();
+          phone = customer?.phone?.trim() || null;
         }
 
         if (phone) {
           const slug = await getRestaurantSlug();
+          console.log(`[WhatsApp][NOTIF] Disparando order_delivered para pedido ${order.id.slice(0, 8)} (phone=${phone})`);
           supabase.functions.invoke("whatsapp-notifications", {
             body: {
               restaurant_id: restaurantId,
@@ -286,13 +298,24 @@ export function useOrderStatusAdvance(restaurantId: string) {
               context: {
                 nome: order.customer_name || "Cliente",
                 numero_pedido: order.id.slice(0, 8),
+                order_id: order.id,
                 phone,
                 link_avaliacao: buildPublicUrl(slug, `pedido/${order.id}`),
               },
             },
-          }).catch(() => {});
+          })
+            .then((res) => {
+              if (res.error) console.error("[WhatsApp][NOTIF] order_delivered error:", res.error);
+              else console.log("[WhatsApp][NOTIF] order_delivered ok:", res.data);
+            })
+            .catch((err) => console.error("[WhatsApp][NOTIF] order_delivered threw:", err));
+        } else {
+          console.warn(
+            `[WhatsApp][NOTIF] Pedido ${order.id.slice(0, 8)} finalizado sem telefone — order_delivered não enviada.`
+          );
         }
       }
+
 
       toast.success("Status atualizado!");
       return true;
