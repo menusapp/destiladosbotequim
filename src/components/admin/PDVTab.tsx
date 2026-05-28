@@ -2195,22 +2195,22 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
           {/* Footer — mobile step-aware */}
           {isMobile && (
-            <div className="border-t pt-3 mt-2 pb-[env(safe-area-inset-bottom)] flex items-center gap-2">
+            <div className="shrink-0 border-t pt-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] flex items-center gap-2">
               {/* Back button */}
-              {mobileStep !== "produtos" && (
+              {mobileStep !== "dados" && (
                 <Button
                   variant="outline"
                   size="lg"
-                  className="h-12 px-4 rounded-xl"
-                  onClick={() => setMobileStep(mobileStep === "pagamento" ? "dados" : "produtos")}
+                  className="h-11 px-3 rounded-xl"
+                  onClick={() => setMobileStep(mobileStep === "pagamento" ? "produtos" : "dados")}
                 >
                   ←
                 </Button>
               )}
 
               {/* Cart pill */}
-              <div className="flex-1 flex items-center gap-2 h-12 px-3 rounded-xl bg-muted">
-                <ShoppingCart className="w-4 h-4 text-muted-foreground" />
+              <div className="flex-1 flex items-center gap-2 h-11 px-3 rounded-xl bg-muted min-w-0">
+                <ShoppingCart className="w-4 h-4 text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-[10px] leading-none text-muted-foreground">
                     {cart.length} ite{cart.length !== 1 ? "ns" : "m"}
@@ -2225,7 +2225,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               {mobileStep === "pagamento" ? (
                 <Button
                   size="lg"
-                  className="h-12 px-5 rounded-xl font-bold flex-shrink-0"
+                  className="h-11 px-4 rounded-xl font-bold flex-shrink-0"
                   onClick={handleSubmit}
                   disabled={submitting || cart.length === 0 || !customerName.trim()}
                   data-tour="pdv-confirm"
@@ -2236,15 +2236,30 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
               ) : (
                 <Button
                   size="lg"
-                  className="h-12 px-5 rounded-xl font-bold flex-shrink-0"
-                  onClick={() => setMobileStep(mobileStep === "produtos" ? "dados" : "pagamento")}
-                  disabled={cart.length === 0}
+                  className="h-11 px-4 rounded-xl font-bold flex-shrink-0"
+                  onClick={() => {
+                    if (mobileStep === "dados") {
+                      if (orderType === "mesa" && !selectedTableId) {
+                        toast.error("Selecione uma mesa");
+                        return;
+                      }
+                      if (orderType === "delivery" && !deliveryAddress.trim()) {
+                        toast.error("Informe o endereço de entrega");
+                        return;
+                      }
+                      setMobileStep("produtos");
+                    } else {
+                      setMobileStep("pagamento");
+                    }
+                  }}
+                  disabled={mobileStep === "produtos" && cart.length === 0}
                 >
                   Próximo →
                 </Button>
               )}
             </div>
           )}
+
         </div>
       </div>
 
