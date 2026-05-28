@@ -1968,7 +1968,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
 
                     const categoriesArr = Array.from(categoryMap.entries());
 
-                    const renderProduct = (product: any) => (
+                    const renderProductDesktop = (product: any) => (
                       <Card
                         key={product.id}
                         className="cursor-pointer hover:shadow-md active:scale-[0.98] transition-all touch-manipulation"
@@ -1984,17 +1984,107 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                       >
                         <CardContent className="p-2 space-y-1">
                           {product.image_url ? (
-                            <img src={product.image_url} alt={product.name} loading="lazy" className="w-full h-20 sm:h-14 object-cover rounded" />
+                            <img src={product.image_url} alt={product.name} loading="lazy" className="w-full h-14 object-cover rounded" />
                           ) : (
-                            <div className="w-full h-20 sm:h-14 bg-muted rounded flex items-center justify-center text-base font-bold text-muted-foreground">
+                            <div className="w-full h-14 bg-muted rounded flex items-center justify-center text-base font-bold text-muted-foreground">
                               {product.name.charAt(0)}
                             </div>
                           )}
-                          <p className="text-sm sm:text-xs font-medium line-clamp-2 leading-tight min-h-[2.25rem] sm:min-h-0">{product.name}</p>
-                          <p className="text-sm sm:text-xs font-bold text-primary">R$ {product.price.toFixed(2)}</p>
+                          <p className="text-xs font-medium line-clamp-2 leading-tight">{product.name}</p>
+                          <p className="text-xs font-bold text-primary">R$ {product.price.toFixed(2)}</p>
                         </CardContent>
                       </Card>
                     );
+
+                    const renderProductMobile = (product: any) => {
+                      const inCart = cart.filter(c => c.productId === product.id).reduce((s, c) => s + c.quantity, 0);
+                      return (
+                        <button
+                          key={product.id}
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              setSelectedProduct(await withProductComplements(product));
+                            } catch (error) {
+                              console.error("Erro ao carregar complementos:", error);
+                              setSelectedProduct(product);
+                            }
+                            setIsProductDrawerOpen(true);
+                          }}
+                          className="w-full flex items-center gap-3 p-2.5 bg-background border border-border rounded-2xl active:scale-[0.98] active:bg-muted transition-all text-left"
+                        >
+                          {product.image_url ? (
+                            <img src={product.image_url} alt={product.name} loading="lazy" className="w-16 h-16 object-cover rounded-xl flex-shrink-0" />
+                          ) : (
+                            <div className="w-16 h-16 bg-muted rounded-xl flex items-center justify-center text-xl font-bold text-muted-foreground flex-shrink-0">
+                              {product.name.charAt(0)}
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold leading-tight line-clamp-2">{product.name}</p>
+                            <p className="text-base font-bold text-primary mt-1">R$ {product.price.toFixed(2).replace(".", ",")}</p>
+                          </div>
+                          <div className="relative flex-shrink-0">
+                            <div className="w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-sm">
+                              <Plus className="w-5 h-5" />
+                            </div>
+                            {inCart > 0 && (
+                              <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center shadow">
+                                {inCart}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    };
+
+                    const renderProduct = isMobile ? renderProductMobile : renderProductDesktop;
+
+                    // Mobile: category chips horizontal + filtered list
+                    if (isMobile) {
+                      const allCats = [
+                        { id: "all", name: "Todos" },
+                        ...categoriesArr.map(([id, { name }]) => ({ id, name })),
+                        ...(uncategorized.length > 0 ? [{ id: "__other", name: "Outros" }] : []),
+                      ];
+                      const visibleProducts = mobileCategoryFilter === "all"
+                        ? filteredProducts
+                        : mobileCategoryFilter === "__other"
+                          ? uncategorized
+                          : (categoryMap.get(mobileCategoryFilter)?.products || []);
+
+                      return (
+                        <>
+                          <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-none sticky top-0 bg-background z-10">
+                            {allCats.map(c => {
+                              const active = mobileCategoryFilter === c.id;
+                              return (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => setMobileCategoryFilter(c.id)}
+                                  className={cn(
+                                    "flex-shrink-0 h-9 px-4 rounded-full text-xs font-semibold border transition-all whitespace-nowrap",
+                                    active
+                                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                                      : "bg-background text-foreground border-border active:scale-95"
+                                  )}
+                                >
+                                  {c.name}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="space-y-2 mt-2">
+                            {visibleProducts.length === 0 ? (
+                              <p className="text-sm text-muted-foreground text-center py-8">Nenhum produto</p>
+                            ) : (
+                              visibleProducts.map(renderProductMobile)
+                            )}
+                          </div>
+                        </>
+                      );
+                    }
 
                     return (
                       <>
