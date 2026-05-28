@@ -97,6 +97,13 @@ const GS = "\x1D";
 
 const ESCPOS = {
   INIT: ESC + "@",
+  // Seleciona code page CP850 (Latin-1, com suporte a acentos PT-BR: á é í ó ú â ê ô ã õ ç etc.)
+  // ESC t n  →  n = 2  → PC850 (Multilingual Latin I) na maioria das térmicas ESC/POS.
+  // Combinado com options.encoding="CP850" no qz.print, o QZ Tray converte a string
+  // UTF-8 para bytes CP850 antes de enviar, então os caracteres acentuados saem corretos.
+  CODEPAGE_CP850: ESC + "t" + "\x02",
+  // Seleciona conjunto internacional "Latin American" (ajuda em algumas impressoras antigas).
+  CHARSET_LATIN: ESC + "R" + "\x08",
   ALIGN_LEFT: ESC + "a" + "\x00",
   ALIGN_CENTER: ESC + "a" + "\x01",
   ALIGN_RIGHT: ESC + "a" + "\x02",
