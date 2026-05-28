@@ -2030,8 +2030,9 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                             <p className="text-base font-bold text-primary mt-1">R$ {product.price.toFixed(2).replace(".", ",")}</p>
                           </div>
                           <div className="relative flex-shrink-0">
-                            <div className="w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-sm">
-                              <Plus className="w-5 h-5" />
+                            <div className="h-11 px-3 rounded-full bg-primary text-primary-foreground flex items-center gap-1 shadow-sm">
+                              <Plus className="w-4 h-4" />
+                              <span className="text-xs font-bold">Adicionar</span>
                             </div>
                             {inCart > 0 && (
                               <span className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center shadow">
@@ -2039,6 +2040,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
                               </span>
                             )}
                           </div>
+
                         </button>
                       );
                     };
