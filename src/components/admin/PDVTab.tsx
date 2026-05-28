@@ -2369,7 +2369,7 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
           setSelectedTableForDrawer(null);
           setOrderType("mesa");
           setSelectedTableId(tableId);
-          if (isMobile) { setMobileStep("produtos"); setMobileOrderPanelOpen(true); }
+          if (isMobile) { setMobileStep("dados"); setMobileOrderPanelOpen(true); }
         }}
         onTableCleared={() => refetchTables()}
       />
