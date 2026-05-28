@@ -414,6 +414,10 @@ function buildCustomerReceipt(
 function buildKitchenReceipt(order: OrderForPrinting): string {
   let out = "";
   out += ESCPOS.INIT;
+  // Selecionar code page CP850 para imprimir acentos PT-BR corretamente.
+  out += ESCPOS.CODEPAGE_CP850;
+  out += ESCPOS.CHARSET_LATIN;
+
 
   // ---------- Cabeçalho ----------
   out += ESCPOS.ALIGN_CENTER;
