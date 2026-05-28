@@ -1454,9 +1454,6 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
             </div>
             )}
           </div>
-              })}
-            </div>
-          </div>
         </div>
 
         {/* Right: Order Creation Panel — desktop inline, mobile bottom sheet */}
