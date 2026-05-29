@@ -248,36 +248,44 @@ export const CheckoutDrawer = ({
         order = inserted;
       }
 
-      // Insert order items
-      for (const item of cart) {
-        // For reward items or coupon free items, price_at_order should be 0
-        const priceAtOrder = (item.isRewardItem || item.isCouponFreeItem) 
-          ? 0 
-          : (item.product.promotional_price ?? item.product.price);
+      // Insert order items (skip when finalizing an existing order — items already exist)
+      if (!existingOrderId) {
+        for (const item of cart) {
+          // For reward items or coupon free items, price_at_order should be 0
+          const priceAtOrder = (item.isRewardItem || item.isCouponFreeItem) 
+            ? 0 
+            : (item.product.promotional_price ?? item.product.price);
 
-        const { data: orderItem, error: itemError } = await supabase
-          .from("order_items")
-          .insert({
-            order_id: order.id,
-            product_id: item.product.id,
-            quantity: item.quantity,
-            price_at_order: priceAtOrder,
-            notes: item.notes,
-          })
-          .select()
-          .single();
+          const { data: orderItem, error: itemError } = await supabase
+            .from("order_items")
+            .insert({
+              order_id: order.id,
+              product_id: item.product.id,
+              quantity: item.quantity,
+              price_at_order: priceAtOrder,
+              notes: item.notes,
+            })
+            .select()
+            .single();
 
-        if (itemError) throw itemError;
+          if (itemError) throw itemError;
 
-        // For reward/coupon items with extras, price should also be 0
-        for (const extra of item.extras) {
-          await supabase.from("order_item_extras").insert({
-            order_item_id: orderItem.id,
-            product_extra_id: (extra as any).is_complement ? null : extra.id,
-            price_at_order: (item.isRewardItem || item.isCouponFreeItem) ? 0 : extra.price,
-            extra_name: extra.name,
-          });
+          // For reward/coupon items with extras, price should also be 0
+          for (const extra of item.extras) {
+            await supabase.from("order_item_extras").insert({
+              order_item_id: orderItem.id,
+              product_extra_id: (extra as any).is_complement ? null : extra.id,
+              price_at_order: (item.isRewardItem || item.isCouponFreeItem) ? 0 : extra.price,
+              extra_name: extra.name,
+            });
+          }
         }
+      }
+
+      // When pre-creating an order for an online payment, stop here — side
+      // effects (loyalty/coupon/address/navigate) only run after confirmation.
+      if (asPending) {
+        return order.id;
       }
 
       // Record loyalty reward redemptions for reward items (free_item type)
