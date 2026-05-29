@@ -755,19 +755,22 @@ export const CheckoutDrawer = ({
           <OnlinePaymentStep
             onBack={() => setStep("payment")}
             onConfirm={(onlinePaymentId) => {
-              // Online payment confirmed — skip summary, submit order directly
+              // Online payment confirmed — finalize the pre-created order
               setPaymentData((prev: any) => ({ 
                 ...prev, 
                 onlinePaymentId,
                 confirmed: true,
                 isOnlinePayment: true,
               }));
-              handleFinishOrder(onlinePaymentId);
+              handleFinishOrder(onlinePaymentId, {
+                existingOrderId: pendingOnlineOrderIdRef.current || undefined,
+              });
             }}
             method={paymentData?.onlineMethod || "pix"}
             amount={onlineTotal}
             restaurantId={restaurant.id}
             orderId={undefined}
+            ensureOrderId={ensurePendingOnlineOrder}
             customerName={customerData?.name || sessionStorage.getItem("customer_name") || ""}
             customerCPF={customerData?.cpf || sessionStorage.getItem("customer_cpf") || ""}
             customerPhone={customerData?.phone || sessionStorage.getItem("customer_phone") || ""}
