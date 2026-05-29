@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Progress } from "@/components/ui/progress";
@@ -90,10 +90,17 @@ export const CheckoutDrawer = ({
   const [deliveryZone, setDeliveryZone] = useState<DeliveryZone | null>(null);
   const [activeRewardDiscount, setActiveRewardDiscount] = useState<DiscountReward | null>(null);
   const [scheduledFor, setScheduledFor] = useState<string | null>(null);
+  // Stores the order id pre-created BEFORE an online payment (PIX) so that the
+  // order persists in the panel even if the user closes the browser tab after
+  // paying. The webhook will mark it as paid; if they never pay it stays pending.
+  const pendingOnlineOrderIdRef = useRef<string | null>(null);
+  const creatingPendingOrderRef = useRef<Promise<string | null> | null>(null);
 
   useEffect(() => {
     if (open) {
       setStep("cart");
+      pendingOnlineOrderIdRef.current = null;
+      creatingPendingOrderRef.current = null;
     }
   }, [open]);
 
@@ -144,10 +151,16 @@ export const CheckoutDrawer = ({
     }
   };
 
-  const handleFinishOrder = async (onlinePaymentId?: string) => {
-    if (submitting) return;
-    
-    setSubmitting(true);
+  const handleFinishOrder = async (
+    onlinePaymentId?: string,
+    options?: { asPending?: boolean; existingOrderId?: string }
+  ): Promise<string | null> => {
+    const asPending = !!options?.asPending;
+    const existingOrderId = options?.existingOrderId;
+
+    if (submitting && !asPending) return null;
+
+    if (!asPending) setSubmitting(true);
     try {
       const couponDiscount = Math.round((coupon ? calculateCouponDiscount(subtotal, coupon) : 0) * 100) / 100;
       const loyaltyDiscount = Math.round((loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01)) * 100) / 100;
@@ -182,7 +195,9 @@ export const CheckoutDrawer = ({
         delivery_phone: phoneToUse,
         delivery_neighborhood: deliveryType === "delivery" ? addressData?.address?.neighborhood : null,
         delivery_city: deliveryType === "delivery" ? addressData?.address?.city : null,
-        payment_type: paymentData?.method || (onlinePaymentId ? "online" : "pending"),
+        payment_type: asPending
+          ? "online"
+          : (paymentData?.method || (onlinePaymentId ? "online" : "pending")),
         payment_brand: paymentData?.payment_brand || null,
         coupon_code: coupon?.code,
         coupon_discount: couponDiscount,
@@ -190,55 +205,87 @@ export const CheckoutDrawer = ({
         loyalty_points_used: loyaltyPointsUsed,
         loyalty_points_earned: Math.floor(subtotal * (restaurant.loyalty_points_per_real || 1)),
         status: "pending",
-        payment_status: onlinePaymentId ? "paid" : "pending",
+        payment_status: asPending
+          ? "pending"
+          : (onlinePaymentId ? "paid" : "pending"),
         notes: paymentData?.changeFor ? `Troco para: R$ ${paymentData.changeFor}` : null,
-        online_payment_id: onlinePaymentId || paymentData?.onlinePaymentId || null,
+        online_payment_id: asPending ? null : (onlinePaymentId || paymentData?.onlinePaymentId || null),
         reward_discount: rewardDiscount,
         reward_id: activeRewardDiscount?.id || null,
         dd_scheduled_for: scheduledFor ? new Date(`${scheduledFor}`).toISOString() : null,
       };
 
-      const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .insert(orderData)
-        .select()
-        .single();
+      let order: any;
 
-      if (orderError) {
-        console.error("Erro ao criar pedido:", orderError);
-        throw orderError;
-      }
-
-      // Insert order items
-      for (const item of cart) {
-        // For reward items or coupon free items, price_at_order should be 0
-        const priceAtOrder = (item.isRewardItem || item.isCouponFreeItem) 
-          ? 0 
-          : (item.product.promotional_price ?? item.product.price);
-
-        const { data: orderItem, error: itemError } = await supabase
-          .from("order_items")
-          .insert({
-            order_id: order.id,
-            product_id: item.product.id,
-            quantity: item.quantity,
-            price_at_order: priceAtOrder,
-            notes: item.notes,
+      if (existingOrderId) {
+        // Finalize previously pre-created online-payment order: just update it.
+        const { data: updated, error: updateError } = await supabase
+          .from("orders")
+          .update({
+            payment_type: orderData.payment_type,
+            payment_status: orderData.payment_status,
+            online_payment_id: orderData.online_payment_id,
           })
+          .eq("id", existingOrderId)
+          .select()
+          .single();
+        if (updateError) {
+          console.error("Erro ao finalizar pedido online:", updateError);
+          throw updateError;
+        }
+        order = updated;
+      } else {
+        const { data: inserted, error: orderError } = await supabase
+          .from("orders")
+          .insert(orderData)
           .select()
           .single();
 
-        if (itemError) throw itemError;
-
-        // For reward/coupon items with extras, price should also be 0
-        for (const extra of item.extras) {
-          await supabase.from("order_item_extras").insert({
-            order_item_id: orderItem.id,
-            product_extra_id: (extra as any).is_complement ? null : extra.id,
-            price_at_order: (item.isRewardItem || item.isCouponFreeItem) ? 0 : extra.price,
-            extra_name: extra.name,
-          });
+        if (orderError) {
+          console.error("Erro ao criar pedido:", orderError);
+          throw orderError;
         }
+        order = inserted;
+      }
+
+      // Insert order items (skip when finalizing an existing order — items already exist)
+      if (!existingOrderId) {
+        for (const item of cart) {
+          // For reward items or coupon free items, price_at_order should be 0
+          const priceAtOrder = (item.isRewardItem || item.isCouponFreeItem) 
+            ? 0 
+            : (item.product.promotional_price ?? item.product.price);
+
+          const { data: orderItem, error: itemError } = await supabase
+            .from("order_items")
+            .insert({
+              order_id: order.id,
+              product_id: item.product.id,
+              quantity: item.quantity,
+              price_at_order: priceAtOrder,
+              notes: item.notes,
+            })
+            .select()
+            .single();
+
+          if (itemError) throw itemError;
+
+          // For reward/coupon items with extras, price should also be 0
+          for (const extra of item.extras) {
+            await supabase.from("order_item_extras").insert({
+              order_item_id: orderItem.id,
+              product_extra_id: (extra as any).is_complement ? null : extra.id,
+              price_at_order: (item.isRewardItem || item.isCouponFreeItem) ? 0 : extra.price,
+              extra_name: extra.name,
+            });
+          }
+        }
+      }
+
+      // When pre-creating an order for an online payment, stop here — side
+      // effects (loyalty/coupon/address/navigate) only run after confirmation.
+      if (asPending) {
+        return order.id;
       }
 
       // Record loyalty reward redemptions for reward items (free_item type)
@@ -359,6 +406,7 @@ export const CheckoutDrawer = ({
 
       navigate(`/${restaurantSlug}/pedido/${order.id}`);
       toast.success("Pedido realizado com sucesso! 🎉");
+      return order.id;
     } catch (error: any) {
       console.error("Erro ao finalizar pedido:", error);
       const errorMessage = error?.message 
@@ -366,9 +414,28 @@ export const CheckoutDrawer = ({
         : "Erro ao finalizar pedido. Tente novamente.";
       toast.error(errorMessage);
       // Reset to payment step so user isn't stuck on loading screen
-      setStep("payment");
+      if (!asPending) setStep("payment");
+      return null;
     } finally {
-      setSubmitting(false);
+      if (!asPending) setSubmitting(false);
+    }
+  };
+
+  // Ensures a pending order exists for online payment BEFORE we hit MercadoPago,
+  // so that the order is never lost if the user closes the browser after paying.
+  const ensurePendingOnlineOrder = async (): Promise<string | null> => {
+    if (pendingOnlineOrderIdRef.current) return pendingOnlineOrderIdRef.current;
+    if (creatingPendingOrderRef.current) return creatingPendingOrderRef.current;
+    const p = (async () => {
+      const id = await handleFinishOrder(undefined, { asPending: true });
+      if (id) pendingOnlineOrderIdRef.current = id;
+      return id;
+    })();
+    creatingPendingOrderRef.current = p;
+    try {
+      return await p;
+    } finally {
+      creatingPendingOrderRef.current = null;
     }
   };
 
@@ -688,19 +755,22 @@ export const CheckoutDrawer = ({
           <OnlinePaymentStep
             onBack={() => setStep("payment")}
             onConfirm={(onlinePaymentId) => {
-              // Online payment confirmed — skip summary, submit order directly
+              // Online payment confirmed — finalize the pre-created order
               setPaymentData((prev: any) => ({ 
                 ...prev, 
                 onlinePaymentId,
                 confirmed: true,
                 isOnlinePayment: true,
               }));
-              handleFinishOrder(onlinePaymentId);
+              handleFinishOrder(onlinePaymentId, {
+                existingOrderId: pendingOnlineOrderIdRef.current || undefined,
+              });
             }}
             method={paymentData?.onlineMethod || "pix"}
             amount={onlineTotal}
             restaurantId={restaurant.id}
             orderId={undefined}
+            ensureOrderId={ensurePendingOnlineOrder}
             customerName={customerData?.name || sessionStorage.getItem("customer_name") || ""}
             customerCPF={customerData?.cpf || sessionStorage.getItem("customer_cpf") || ""}
             customerPhone={customerData?.phone || sessionStorage.getItem("customer_phone") || ""}

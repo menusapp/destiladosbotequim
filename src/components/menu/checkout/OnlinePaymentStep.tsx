@@ -23,6 +23,13 @@ interface OnlinePaymentStepProps {
   amount: number;
   restaurantId: string;
   orderId?: string;
+  /**
+   * Optional resolver invoked just before contacting the payment gateway, so
+   * the parent can pre-create the order in the DB and return its id. This
+   * guarantees the order is never lost if the user closes the browser after
+   * paying (the webhook will still find the order via order_id).
+   */
+  ensureOrderId?: () => Promise<string | null>;
   customerName: string;
   customerCPF: string;
   customerPhone: string;
@@ -38,6 +45,7 @@ export const OnlinePaymentStep = ({
   amount,
   restaurantId,
   orderId,
+  ensureOrderId,
   customerName,
   customerCPF,
   customerPhone,
@@ -191,10 +199,11 @@ export const OnlinePaymentStep = ({
       setPaymentStatus("loading");
       const safeAmount = Number(Math.max(0.1, Math.round(amount * 100) / 100).toFixed(2));
       const safeEmail = customerEmail && customerEmail.trim() ? customerEmail.trim() : `cliente-${Date.now()}@pedido.com`;
+      const resolvedOrderId = orderId ?? (ensureOrderId ? await ensureOrderId() : undefined) ?? undefined;
       const { data, error } = await supabase.functions.invoke("mercadopago-charge", {
         body: {
           restaurant_id: restaurantId,
-          order_id: orderId,
+          order_id: resolvedOrderId,
           amount: safeAmount,
           billing_type: "PIX",
           customer_name: customerName,
@@ -281,10 +290,11 @@ export const OnlinePaymentStep = ({
       try {
         const safeAmount = Number(Math.max(0.1, Math.round(amount * 100) / 100).toFixed(2));
         const safeEmail = customerEmail && customerEmail.trim() ? customerEmail.trim() : `cliente-${Date.now()}@pedido.com`;
+        const resolvedOrderId = orderId ?? (ensureOrderId ? await ensureOrderId() : undefined) ?? undefined;
         const { data, error } = await supabase.functions.invoke("mercadopago-charge", {
           body: {
             restaurant_id: restaurantId,
-            order_id: orderId,
+            order_id: resolvedOrderId,
             amount: safeAmount,
             billing_type: "CREDIT_CARD",
             action: "pay_with_saved_card",
@@ -384,10 +394,11 @@ export const OnlinePaymentStep = ({
 
       const safeAmount = Number(Math.max(0.1, Math.round(amount * 100) / 100).toFixed(2));
       const safeEmail = customerEmail && customerEmail.trim() ? customerEmail.trim() : `cliente-${Date.now()}@pedido.com`;
+      const resolvedOrderId = orderId ?? (ensureOrderId ? await ensureOrderId() : undefined) ?? undefined;
       const { data, error } = await supabase.functions.invoke("mercadopago-charge", {
         body: {
           restaurant_id: restaurantId,
-          order_id: orderId,
+          order_id: resolvedOrderId,
           amount: safeAmount,
           billing_type: "CREDIT_CARD",
           customer_name: customerName,
