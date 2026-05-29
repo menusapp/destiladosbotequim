@@ -233,7 +233,7 @@ export function useOrderStatusAdvance(restaurantId: string) {
 
     setLoadingOrderId(order.id);
     try {
-      await syncIfoodStatus(order, newStatus);
+      await syncIfoodStatus(order, newStatus, reason);
 
       const ddResult = await syncDDStatus(order, newStatus, reason);
       if (!ddResult.ok) {
