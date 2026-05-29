@@ -151,10 +151,16 @@ export const CheckoutDrawer = ({
     }
   };
 
-  const handleFinishOrder = async (onlinePaymentId?: string) => {
-    if (submitting) return;
-    
-    setSubmitting(true);
+  const handleFinishOrder = async (
+    onlinePaymentId?: string,
+    options?: { asPending?: boolean; existingOrderId?: string }
+  ): Promise<string | null> => {
+    const asPending = !!options?.asPending;
+    const existingOrderId = options?.existingOrderId;
+
+    if (submitting && !asPending) return null;
+
+    if (!asPending) setSubmitting(true);
     try {
       const couponDiscount = Math.round((coupon ? calculateCouponDiscount(subtotal, coupon) : 0) * 100) / 100;
       const loyaltyDiscount = Math.round((loyaltyPointsUsed * (restaurant.loyalty_real_per_point || 0.01)) * 100) / 100;
@@ -189,7 +195,9 @@ export const CheckoutDrawer = ({
         delivery_phone: phoneToUse,
         delivery_neighborhood: deliveryType === "delivery" ? addressData?.address?.neighborhood : null,
         delivery_city: deliveryType === "delivery" ? addressData?.address?.city : null,
-        payment_type: paymentData?.method || (onlinePaymentId ? "online" : "pending"),
+        payment_type: asPending
+          ? "online"
+          : (paymentData?.method || (onlinePaymentId ? "online" : "pending")),
         payment_brand: paymentData?.payment_brand || null,
         coupon_code: coupon?.code,
         coupon_discount: couponDiscount,
@@ -197,23 +205,47 @@ export const CheckoutDrawer = ({
         loyalty_points_used: loyaltyPointsUsed,
         loyalty_points_earned: Math.floor(subtotal * (restaurant.loyalty_points_per_real || 1)),
         status: "pending",
-        payment_status: onlinePaymentId ? "paid" : "pending",
+        payment_status: asPending
+          ? "pending"
+          : (onlinePaymentId ? "paid" : "pending"),
         notes: paymentData?.changeFor ? `Troco para: R$ ${paymentData.changeFor}` : null,
-        online_payment_id: onlinePaymentId || paymentData?.onlinePaymentId || null,
+        online_payment_id: asPending ? null : (onlinePaymentId || paymentData?.onlinePaymentId || null),
         reward_discount: rewardDiscount,
         reward_id: activeRewardDiscount?.id || null,
         dd_scheduled_for: scheduledFor ? new Date(`${scheduledFor}`).toISOString() : null,
       };
 
-      const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .insert(orderData)
-        .select()
-        .single();
+      let order: any;
 
-      if (orderError) {
-        console.error("Erro ao criar pedido:", orderError);
-        throw orderError;
+      if (existingOrderId) {
+        // Finalize previously pre-created online-payment order: just update it.
+        const { data: updated, error: updateError } = await supabase
+          .from("orders")
+          .update({
+            payment_type: orderData.payment_type,
+            payment_status: orderData.payment_status,
+            online_payment_id: orderData.online_payment_id,
+          })
+          .eq("id", existingOrderId)
+          .select()
+          .single();
+        if (updateError) {
+          console.error("Erro ao finalizar pedido online:", updateError);
+          throw updateError;
+        }
+        order = updated;
+      } else {
+        const { data: inserted, error: orderError } = await supabase
+          .from("orders")
+          .insert(orderData)
+          .select()
+          .single();
+
+        if (orderError) {
+          console.error("Erro ao criar pedido:", orderError);
+          throw orderError;
+        }
+        order = inserted;
       }
 
       // Insert order items
