@@ -394,10 +394,11 @@ export const OnlinePaymentStep = ({
 
       const safeAmount = Number(Math.max(0.1, Math.round(amount * 100) / 100).toFixed(2));
       const safeEmail = customerEmail && customerEmail.trim() ? customerEmail.trim() : `cliente-${Date.now()}@pedido.com`;
+      const resolvedOrderId = orderId ?? (ensureOrderId ? await ensureOrderId() : undefined) ?? undefined;
       const { data, error } = await supabase.functions.invoke("mercadopago-charge", {
         body: {
           restaurant_id: restaurantId,
-          order_id: orderId,
+          order_id: resolvedOrderId,
           amount: safeAmount,
           billing_type: "CREDIT_CARD",
           customer_name: customerName,
