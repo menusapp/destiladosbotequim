@@ -90,10 +90,17 @@ export const CheckoutDrawer = ({
   const [deliveryZone, setDeliveryZone] = useState<DeliveryZone | null>(null);
   const [activeRewardDiscount, setActiveRewardDiscount] = useState<DiscountReward | null>(null);
   const [scheduledFor, setScheduledFor] = useState<string | null>(null);
+  // Stores the order id pre-created BEFORE an online payment (PIX) so that the
+  // order persists in the panel even if the user closes the browser tab after
+  // paying. The webhook will mark it as paid; if they never pay it stays pending.
+  const pendingOnlineOrderIdRef = useRef<string | null>(null);
+  const creatingPendingOrderRef = useRef<Promise<string | null> | null>(null);
 
   useEffect(() => {
     if (open) {
       setStep("cart");
+      pendingOnlineOrderIdRef.current = null;
+      creatingPendingOrderRef.current = null;
     }
   }, [open]);
 
