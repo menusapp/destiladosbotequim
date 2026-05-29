@@ -208,7 +208,7 @@ function buildCustomerPreview(
     }
 
     for (const ex of item.order_item_extras) {
-      out += lineLR(`  + ${ex.name}`, formatPrice(ex.price), width);
+      out += lineLR(`  + ${ex.name}`, formatPrice(ex.price), width) + "  [NEGRITO]\n";
     }
 
     if (item.notes && item.notes.trim()) {
@@ -330,7 +330,7 @@ function buildKitchenPreview(order: OrderForPrinting, width: number): string {
       out += l + "  [GRANDE+NEGRITO]\n";
 
     for (const ex of item.order_item_extras) {
-      out += "  + " + ex.name + "\n";
+      out += "  + " + ex.name + "  [NEGRITO]\n";
     }
 
     if (item.notes && item.notes.trim()) {

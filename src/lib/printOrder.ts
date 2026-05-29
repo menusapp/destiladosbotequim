@@ -394,6 +394,7 @@ export const printOrder = async (
         }
         .extra {
           font-size: 11px;
+          font-weight: bold;
           display: flex;
           justify-content: space-between;
           padding-left: 8px;
@@ -560,7 +561,7 @@ export const printKitchenReceipt = async (
         .label { text-align: center; font-size: 13px; margin: 6px 0; }
         .item { margin: 10px 0; }
         .item-name { font-size: 14px; }
-        .extra { font-size: 12px; padding-left: 12px; }
+        .extra { font-size: 12px; font-weight: bold; padding-left: 12px; }
         .obs { font-size: 12px; padding-left: 12px; font-style: italic; }
         .item-sep { border-top: 1px dashed #000; margin: 8px 0; }
         .footer { text-align: center; font-size: 13px; padding: 8px 0; border: 2px solid #000; margin-top: 12px; }
