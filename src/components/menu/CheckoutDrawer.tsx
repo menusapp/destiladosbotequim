@@ -406,6 +406,7 @@ export const CheckoutDrawer = ({
 
       navigate(`/${restaurantSlug}/pedido/${order.id}`);
       toast.success("Pedido realizado com sucesso! 🎉");
+      return order.id;
     } catch (error: any) {
       console.error("Erro ao finalizar pedido:", error);
       const errorMessage = error?.message 
@@ -413,9 +414,28 @@ export const CheckoutDrawer = ({
         : "Erro ao finalizar pedido. Tente novamente.";
       toast.error(errorMessage);
       // Reset to payment step so user isn't stuck on loading screen
-      setStep("payment");
+      if (!asPending) setStep("payment");
+      return null;
     } finally {
-      setSubmitting(false);
+      if (!asPending) setSubmitting(false);
+    }
+  };
+
+  // Ensures a pending order exists for online payment BEFORE we hit MercadoPago,
+  // so that the order is never lost if the user closes the browser after paying.
+  const ensurePendingOnlineOrder = async (): Promise<string | null> => {
+    if (pendingOnlineOrderIdRef.current) return pendingOnlineOrderIdRef.current;
+    if (creatingPendingOrderRef.current) return creatingPendingOrderRef.current;
+    const p = (async () => {
+      const id = await handleFinishOrder(undefined, { asPending: true });
+      if (id) pendingOnlineOrderIdRef.current = id;
+      return id;
+    })();
+    creatingPendingOrderRef.current = p;
+    try {
+      return await p;
+    } finally {
+      creatingPendingOrderRef.current = null;
     }
   };
 
