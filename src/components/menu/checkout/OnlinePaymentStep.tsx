@@ -23,6 +23,13 @@ interface OnlinePaymentStepProps {
   amount: number;
   restaurantId: string;
   orderId?: string;
+  /**
+   * Optional resolver invoked just before contacting the payment gateway, so
+   * the parent can pre-create the order in the DB and return its id. This
+   * guarantees the order is never lost if the user closes the browser after
+   * paying (the webhook will still find the order via order_id).
+   */
+  ensureOrderId?: () => Promise<string | null>;
   customerName: string;
   customerCPF: string;
   customerPhone: string;
@@ -38,6 +45,7 @@ export const OnlinePaymentStep = ({
   amount,
   restaurantId,
   orderId,
+  ensureOrderId,
   customerName,
   customerCPF,
   customerPhone,
