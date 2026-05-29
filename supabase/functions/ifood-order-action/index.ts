@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { restaurant_id, ifood_order_id, order_id, action, cancellation_code } = await req.json();
+    const { restaurant_id, ifood_order_id, order_id, action, cancellation_code, reason } = await req.json();
 
     if (!restaurant_id || !ifood_order_id || !action) {
       return new Response(
@@ -68,9 +68,13 @@ Deno.serve(async (req) => {
       },
     };
 
-    // Add cancellation body if needed
-    if (action === "cancel" && cancellation_code) {
-      fetchOptions.body = JSON.stringify({ cancellationCode: cancellation_code });
+    // Add cancellation body if needed — iFood requires BOTH code and reason
+    if (action === "cancel") {
+      const body: Record<string, string> = {
+        cancellationCode: cancellation_code || "501",
+        reason: reason || "Cancelado pelo restaurante",
+      };
+      fetchOptions.body = JSON.stringify(body);
     }
 
     const response = await fetch(url, fetchOptions);
