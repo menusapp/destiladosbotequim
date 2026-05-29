@@ -533,13 +533,30 @@ Deno.serve(async (req) => {
           .update({ status: "accepted" })
           .eq("ifood_order_id", orderId)
           .eq("restaurant_id", restaurant_id);
-      } else if (eventCode === "CANCELLED" || eventCode === "CANCELLATION_REQUESTED") {
+      } else if (eventCode === "READY_TO_PICKUP" || eventCode === "RTP") {
         await supabase
           .from("orders")
-          .update({ status: "cancelled" })
+          .update({ status: "ready" })
           .eq("ifood_order_id", orderId)
           .eq("restaurant_id", restaurant_id);
-      } else if (eventCode === "CONCLUSION") {
+      } else if (eventCode === "DISPATCHED" || eventCode === "DSP") {
+        await supabase
+          .from("orders")
+          .update({ status: "out_for_delivery" })
+          .eq("ifood_order_id", orderId)
+          .eq("restaurant_id", restaurant_id);
+      } else if (eventCode === "CANCELLED" || eventCode === "CANCELLATION_REQUESTED" || eventCode === "CAN") {
+        const cancelReason =
+          event.metadata?.cancellationReason ||
+          event.metadata?.reason ||
+          event.cancellationReason ||
+          `Cancelado pelo iFood (${eventCode})`;
+        await supabase
+          .from("orders")
+          .update({ status: "cancelled", cancellation_reason: cancelReason })
+          .eq("ifood_order_id", orderId)
+          .eq("restaurant_id", restaurant_id);
+      } else if (eventCode === "CONCLUDED" || eventCode === "CONCLUSION" || eventCode === "CON") {
         await supabase
           .from("orders")
           .update({ status: "delivered" })
