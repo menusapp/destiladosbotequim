@@ -209,7 +209,7 @@ export function useOrderStatusAdvance(restaurantId: string) {
     const ifoodAction = statusToAction[newStatus];
     if (!ifoodAction) return;
     const { error } = await supabase.functions.invoke("ifood-order-action", {
-      body: { restaurant_id: restaurantId, ifood_order_id: order.ifood_order_id, order_id: order.id, action: ifoodAction },
+      body: { restaurant_id: restaurantId, ifood_order_id: order.ifood_order_id, order_id: order.id, action: ifoodAction, reason },
     });
     if (error) {
       console.error("iFood action error:", error);
