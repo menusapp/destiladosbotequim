@@ -200,7 +200,7 @@ export function useOrderStatusAdvance(restaurantId: string) {
     } catch (e) { return { ok: false, errorMsg: (e as Error).message }; }
   };
 
-  const syncIfoodStatus = async (order: Order, newStatus: string) => {
+  const syncIfoodStatus = async (order: Order, newStatus: string, reason?: string) => {
     if (!order.ifood_source || !order.ifood_order_id) return;
     const statusToAction: Record<string, string> = {
       accepted: "confirm", preparing: "start_preparation", ready: "ready_to_pickup",
