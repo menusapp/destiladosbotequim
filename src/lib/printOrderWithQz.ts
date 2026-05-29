@@ -308,7 +308,7 @@ function buildCustomerReceipt(
 
     // Extras / complementos
     for (const ex of item.order_item_extras) {
-      out += lineLR(`  + ${ex.name}`, formatPrice(ex.price));
+      out += ESCPOS.BOLD_ON + lineLR(`  + ${ex.name}`, formatPrice(ex.price)) + ESCPOS.BOLD_OFF;
     }
 
     if (item.notes && item.notes.trim()) {
@@ -473,7 +473,7 @@ function buildKitchenReceipt(order: OrderForPrinting): string {
 
     // Extras / complementos
     for (const ex of item.order_item_extras) {
-      out += "  + " + ex.name + "\n";
+      out += ESCPOS.BOLD_ON + "  + " + ex.name + "\n" + ESCPOS.BOLD_OFF;
     }
 
     if (item.notes && item.notes.trim()) {
