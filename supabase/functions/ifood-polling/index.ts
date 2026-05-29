@@ -247,8 +247,42 @@ Deno.serve(async (req) => {
             ?? 0;
           const deliveryFeeNum = typeof deliveryFee === 'object' ? (deliveryFee?.value || 0) : (deliveryFee || 0);
 
-          // ── Payment type ────────────────────────────────────────────────
+          // ── Order type: DELIVERY vs TAKEOUT/INDOOR (pickup) ─────────────
+          const ifoodOrderType = String(orderData.orderType || "DELIVERY").toUpperCase();
+          const isPickup = ifoodOrderType === "TAKEOUT" || ifoodOrderType === "INDOOR";
+          const deliveryTypeValue = isPickup ? "pickup" : "delivery";
+
+          // ── Scheduled order ────────────────────────────────────────────
+          const ifoodTiming = String(orderData.orderTiming || "").toUpperCase();
+          const scheduledFor =
+            orderData.schedule?.deliveryDateTime ||
+            orderData.schedule?.scheduledDateTimeStart ||
+            orderData.scheduledDateTime ||
+            null;
+          const isScheduled = ifoodTiming === "SCHEDULED" || !!scheduledFor;
+
+          // ── Voucher / coupon discount ──────────────────────────────────
+          let couponCode: string | null = null;
+          let couponDiscount = 0;
+          const benefits = Array.isArray(orderData.benefits) ? orderData.benefits : [];
+          for (const b of benefits) {
+            const benefitValue = Number(b?.value || b?.benefitValue || 0);
+            if (benefitValue > 0) {
+              couponDiscount += benefitValue;
+            }
+            const sponsorships = Array.isArray(b?.sponsorshipValues) ? b.sponsorshipValues : [];
+            for (const sp of sponsorships) {
+              if (sp?.name && !couponCode) couponCode = String(sp.name);
+            }
+            if (!couponCode && b?.target) couponCode = String(b.target);
+          }
+          if (couponDiscount === 0 && orderData.total?.benefits) {
+            couponDiscount = Number(orderData.total.benefits) || 0;
+          }
+
+          // ── Payment type + change (cash) ───────────────────────────────
           let paymentType = "Pago pelo iFood";
+          let changeFor: number | null = null;
           const paymentsObj = orderData.payments;
           if (paymentsObj && Array.isArray(paymentsObj.methods) && paymentsObj.methods.length > 0) {
             const p = paymentsObj.methods[0];
@@ -266,6 +300,8 @@ Deno.serve(async (req) => {
               paymentType = "PIX";
             } else if (pMethod.includes("CASH")) {
               paymentType = "Dinheiro";
+              const cf = p.cash?.changeFor ?? p.changeFor ?? p.cash?.changeAmount;
+              if (cf != null) changeFor = Number(cf);
             } else {
               paymentType = "Pago pelo iFood";
             }
@@ -274,10 +310,27 @@ Deno.serve(async (req) => {
           // Customer CPF
           const customerCpf = orderData.customer?.documentNumber || "Não informado";
 
-          // ── Build notes with delivery fee origin ────────────────────────
-          const orderNotes = deliveryFeeNum > 0
-            ? `Pedido iFood #${orderId.slice(0, 8)} | Taxa de entrega: iFood (R$ ${deliveryFeeNum.toFixed(2)})`
-            : `Pedido iFood #${orderId.slice(0, 8)}`;
+          // ── Customer observations / order notes from iFood ─────────────
+          const customerObservation =
+            orderData.observations ||
+            orderData.extraInfo ||
+            orderData.customer?.observations ||
+            "";
+
+          // ── Build notes with delivery fee origin + scheduling + change + obs ──
+          const noteParts: string[] = [`Pedido iFood #${orderId.slice(0, 8)}`];
+          if (isScheduled && scheduledFor) {
+            try {
+              const dt = new Date(scheduledFor);
+              noteParts.push(`AGENDADO: ${dt.toLocaleString("pt-BR")}`);
+            } catch { noteParts.push(`AGENDADO: ${scheduledFor}`); }
+          }
+          if (isPickup) noteParts.push("RETIRADA NO LOCAL");
+          if (deliveryFeeNum > 0) noteParts.push(`Taxa de entrega: iFood (R$ ${deliveryFeeNum.toFixed(2)})`);
+          if (changeFor != null && changeFor > 0) noteParts.push(`TROCO PARA R$ ${changeFor.toFixed(2)}`);
+          if (couponDiscount > 0) noteParts.push(`Voucher${couponCode ? ` (${couponCode})` : ""}: -R$ ${couponDiscount.toFixed(2)}`);
+          if (customerObservation) noteParts.push(`Obs.: ${customerObservation}`);
+          const orderNotes = noteParts.join(" | ");
 
           // Insert order
           const { data: insertedOrder, error: insertError } = await supabase
@@ -289,14 +342,17 @@ Deno.serve(async (req) => {
               customer_cpf: customerCpf,
               status: "pending",
               order_type: "delivery",
-              delivery_type: "delivery",
-              delivery_address: deliveryAddress,
+              delivery_type: deliveryTypeValue,
+              delivery_address: isPickup ? null : deliveryAddress,
               delivery_phone: customerPhone,
-              delivery_fee: deliveryFeeNum,
+              delivery_fee: isPickup ? 0 : deliveryFeeNum,
               payment_type: paymentType,
               ifood_order_id: orderId,
               ifood_source: true,
               notes: orderNotes,
+              coupon_code: couponCode,
+              coupon_discount: couponDiscount,
+              dd_scheduled_for: isScheduled && scheduledFor ? scheduledFor : null,
             })
             .select("id")
             .single();
@@ -477,13 +533,30 @@ Deno.serve(async (req) => {
           .update({ status: "accepted" })
           .eq("ifood_order_id", orderId)
           .eq("restaurant_id", restaurant_id);
-      } else if (eventCode === "CANCELLED" || eventCode === "CANCELLATION_REQUESTED") {
+      } else if (eventCode === "READY_TO_PICKUP" || eventCode === "RTP") {
         await supabase
           .from("orders")
-          .update({ status: "cancelled" })
+          .update({ status: "ready" })
           .eq("ifood_order_id", orderId)
           .eq("restaurant_id", restaurant_id);
-      } else if (eventCode === "CONCLUSION") {
+      } else if (eventCode === "DISPATCHED" || eventCode === "DSP") {
+        await supabase
+          .from("orders")
+          .update({ status: "out_for_delivery" })
+          .eq("ifood_order_id", orderId)
+          .eq("restaurant_id", restaurant_id);
+      } else if (eventCode === "CANCELLED" || eventCode === "CANCELLATION_REQUESTED" || eventCode === "CAN") {
+        const cancelReason =
+          event.metadata?.cancellationReason ||
+          event.metadata?.reason ||
+          event.cancellationReason ||
+          `Cancelado pelo iFood (${eventCode})`;
+        await supabase
+          .from("orders")
+          .update({ status: "cancelled", cancellation_reason: cancelReason })
+          .eq("ifood_order_id", orderId)
+          .eq("restaurant_id", restaurant_id);
+      } else if (eventCode === "CONCLUDED" || eventCode === "CONCLUSION" || eventCode === "CON") {
         await supabase
           .from("orders")
           .update({ status: "delivered" })
