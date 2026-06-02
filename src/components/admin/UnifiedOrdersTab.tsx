@@ -169,12 +169,15 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   useEffect(() => {
     const tick = async () => {
       const now = Date.now();
+      const ONE_HOUR_MS = 60 * 60 * 1000;
+      // Libera o pedido agendado 1 hora antes do horário de entrega/retirada agendado.
       const due = orders.filter(o =>
         o.status === "scheduled" &&
         o.dd_scheduled_for &&
-        new Date(o.dd_scheduled_for).getTime() <= now &&
+        new Date(o.dd_scheduled_for).getTime() - ONE_HOUR_MS <= now &&
         !promotedIdsRef.current.has(o.id)
       );
+
       for (const order of due) {
         promotedIdsRef.current.add(order.id);
         console.log(`[scheduler] Promovendo pedido agendado ${order.id.slice(0,8)} (agendado para ${order.dd_scheduled_for})`);
