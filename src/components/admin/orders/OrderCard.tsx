@@ -134,10 +134,13 @@ const OrderCardBase = ({
           {order.dd_scheduled_for && (
             <Badge className="bg-amber-500 text-white text-[10px] px-1.5 py-0 border-0 gap-0.5">
               <CalendarClock className="w-2.5 h-2.5" />
-              Agendado{" "}
-              {new Date(order.dd_scheduled_for).toLocaleTimeString("pt-BR", {
+              {order.status === "scheduled" ? "Pedido Agendado " : "Agendado "}
+              {new Date(order.dd_scheduled_for).toLocaleString("pt-BR", {
+                day: "2-digit",
+                month: "2-digit",
                 hour: "2-digit",
                 minute: "2-digit",
+                timeZone: "America/Sao_Paulo",
               })}
             </Badge>
           )}

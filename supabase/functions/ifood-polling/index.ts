@@ -340,7 +340,9 @@ Deno.serve(async (req) => {
               table_id: null,
               customer_name: customerName,
               customer_cpf: customerCpf,
-              status: "pending",
+              // Scheduled iFood orders sit in "scheduled" status until their delivery
+              // time is reached; the frontend scheduler promotes them to "pending".
+              status: isScheduled && scheduledFor ? "scheduled" : "pending",
               order_type: "delivery",
               delivery_type: deliveryTypeValue,
               delivery_address: isPickup ? null : deliveryAddress,

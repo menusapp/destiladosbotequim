@@ -11,7 +11,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CalendarIcon, Search, Truck, ShoppingBag, UtensilsCrossed, Package, Store,
-  Printer, AlertTriangle, CreditCard, Banknote, Smartphone, Zap
+  Printer, AlertTriangle, CreditCard, Banknote, Smartphone, Zap, CalendarClock
 } from "lucide-react";
 import { useOrderStatusAdvance, getNextStatus } from "@/hooks/useOrderStatusAdvance";
 import { toast } from "@/components/ui/sonner";
@@ -161,6 +161,48 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     });
   }, [orders, autoAccept, advanceStatus]);
 
+  // Scheduler: promote scheduled orders whose dd_scheduled_for has arrived.
+  // Timezone-agnostic: dd_scheduled_for is stored as timestamptz (UTC) and iFood
+  // returns ISO 8601 with offset, so a direct Date comparison works regardless of
+  // the operator's locale. Display uses America/Sao_Paulo via pt-BR formatting.
+  const promotedIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const tick = async () => {
+      const now = Date.now();
+      const due = orders.filter(o =>
+        o.status === "scheduled" &&
+        o.dd_scheduled_for &&
+        new Date(o.dd_scheduled_for).getTime() <= now &&
+        !promotedIdsRef.current.has(o.id)
+      );
+      for (const order of due) {
+        promotedIdsRef.current.add(order.id);
+        console.log(`[scheduler] Promovendo pedido agendado ${order.id.slice(0,8)} (agendado para ${order.dd_scheduled_for})`);
+        try {
+          if (autoAcceptRef.current) {
+            // Auto-accept: confirms on iFood + updates local status to "accepted"
+            await advanceStatus({ ...order, status: "pending" } as any, "accepted");
+          } else {
+            // Manual flow: promote to pending so it triggers sound/popup/operator action
+            await supabase.rpc("admin_update_order_status", {
+              p_order_id: order.id,
+              p_new_status: "pending",
+              p_restaurant_id: restaurantId,
+            });
+          }
+        } catch (e) {
+          console.error("[scheduler] Falha ao promover pedido agendado:", e);
+          promotedIdsRef.current.delete(order.id); // allow retry
+        }
+      }
+      if (due.length > 0) fetchOrders();
+    };
+    tick();
+    const id = setInterval(tick, 30000);
+    return () => clearInterval(id);
+  }, [orders, restaurantId, advanceStatus]);
+
+
   // iFood polling every 30 seconds
   useEffect(() => {
     const SUPABASE_URL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co`;
@@ -296,6 +338,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
 
   const groupedOrders = useMemo(() => {
     return {
+      scheduled: filteredOrders.filter(o => o.status === "scheduled"),
       pending: filteredOrders.filter(o => o.status === "pending"),
       preparing: filteredOrders.filter(o => ["accepted", "preparing"].includes(o.status)),
       out: filteredOrders.filter(o => ["out_for_delivery", "ready"].includes(o.status)),
@@ -332,6 +375,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   };
 
   const kanbanColumns = [
+    { key: "scheduled", title: "Aguardando Agendamento", color: "bg-amber-500", count: groupedOrders.scheduled.length, icon: <CalendarClock className="w-3.5 h-3.5" /> },
     { key: "pending", title: "Aguardando", color: "bg-orange-400", count: groupedOrders.pending.length },
     { key: "preparing", title: "Preparando", color: "bg-orange-500", count: groupedOrders.preparing.length },
     { key: "out", title: "Saiu / Pronto", color: "bg-orange-600", count: groupedOrders.out.length },
