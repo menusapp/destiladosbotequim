@@ -109,19 +109,45 @@ const OrderCardBase = ({
   const deliveryAddress = order.delivery_address;
   const addressSummary = deliveryAddress ? deliveryAddress.split(",").slice(0, 2).join(",") : null;
   const isClosed = ["delivered", "picked_up", "cancelled"].includes(order.status);
+  const isScheduled = order.status === "scheduled";
+  const scheduledLabel = order.dd_scheduled_for
+    ? new Date(order.dd_scheduled_for).toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "America/Sao_Paulo",
+      }).replace(",", " às")
+    : null;
 
   return (
     <Card
-      className="cursor-pointer bg-card hover:shadow-md transition-all border border-border/50 hover:border-border min-h-[180px]"
+      className={`cursor-pointer bg-card hover:shadow-md transition-all border min-h-[180px] ${
+        isScheduled
+          ? "border-amber-400 border-dashed opacity-70 hover:opacity-100"
+          : "border-border/50 hover:border-border"
+      }`}
       onClick={() => onSelect(order)}
     >
       <CardContent className="p-3 space-y-1.5 flex flex-col h-full">
         <div className="flex items-center justify-between">
           <span className="font-bold text-xs text-muted-foreground">{order.daily_order_number != null ? `Pedido ${order.daily_order_number}` : `#${order.id.slice(0, 8)}`}</span>
-          {showPrepTimer && !isClosed && (
+          {showPrepTimer && !isClosed && !isScheduled && (
             <Badge className={`text-[10px] px-1.5 py-0 ${elapsedClass}`}>{elapsed}min</Badge>
           )}
         </div>
+        {isScheduled && (
+          <div className="bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded px-2 py-1 flex items-center gap-1.5">
+            <CalendarClock className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400" />
+            <div className="flex flex-col leading-tight">
+              <span className="text-[10px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wide">Agendado</span>
+              {scheduledLabel && (
+                <span className="text-[11px] font-semibold text-amber-900 dark:text-amber-200">{scheduledLabel}</span>
+              )}
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-1.5 flex-wrap">
           {typeIcon}
           <span className="text-xs font-medium">{typeLabel}</span>
@@ -131,10 +157,10 @@ const OrderCardBase = ({
           {order.dd_source && (
             <Badge className="bg-[#0066CC] text-white text-[10px] px-1.5 py-0 border-0">Delivery Direto</Badge>
           )}
-          {order.dd_scheduled_for && (
+          {!isScheduled && order.dd_scheduled_for && (
             <Badge className="bg-amber-500 text-white text-[10px] px-1.5 py-0 border-0 gap-0.5">
               <CalendarClock className="w-2.5 h-2.5" />
-              {order.status === "scheduled" ? "Pedido Agendado " : "Agendado "}
+              Agendado{" "}
               {new Date(order.dd_scheduled_for).toLocaleString("pt-BR", {
                 day: "2-digit",
                 month: "2-digit",

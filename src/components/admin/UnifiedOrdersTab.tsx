@@ -11,7 +11,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CalendarIcon, Search, Truck, ShoppingBag, UtensilsCrossed, Package, Store,
-  Printer, AlertTriangle, CreditCard, Banknote, Smartphone, Zap, CalendarClock
+  Printer, AlertTriangle, CreditCard, Banknote, Smartphone, Zap
 } from "lucide-react";
 import { useOrderStatusAdvance, getNextStatus } from "@/hooks/useOrderStatusAdvance";
 import { toast } from "@/components/ui/sonner";
@@ -338,8 +338,10 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
 
   const groupedOrders = useMemo(() => {
     return {
-      scheduled: filteredOrders.filter(o => o.status === "scheduled"),
-      pending: filteredOrders.filter(o => o.status === "pending"),
+      // Scheduled iFood orders share the "Aguardando" column with pending orders.
+      // They stay visually distinct (faded + AGENDADO badge) and don't fire
+      // sound/popup/auto-accept until the scheduler promotes them to "pending".
+      pending: filteredOrders.filter(o => ["pending", "scheduled"].includes(o.status)),
       preparing: filteredOrders.filter(o => ["accepted", "preparing"].includes(o.status)),
       out: filteredOrders.filter(o => ["out_for_delivery", "ready"].includes(o.status)),
       delivered: filteredOrders.filter(o => ["delivered", "picked_up"].includes(o.status)),
@@ -375,7 +377,6 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   };
 
   const kanbanColumns = [
-    { key: "scheduled", title: "Aguardando Agendamento", color: "bg-amber-500", count: groupedOrders.scheduled.length, icon: <CalendarClock className="w-3.5 h-3.5" /> },
     { key: "pending", title: "Aguardando", color: "bg-orange-400", count: groupedOrders.pending.length },
     { key: "preparing", title: "Preparando", color: "bg-orange-500", count: groupedOrders.preparing.length },
     { key: "out", title: "Saiu / Pronto", color: "bg-orange-600", count: groupedOrders.out.length },
