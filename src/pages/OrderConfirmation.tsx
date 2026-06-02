@@ -43,6 +43,8 @@ interface Order {
   loyalty_points_used: number;
   restaurant_id: string;
   delivery_type?: string;
+  service_fee?: number;
+  ifood_source?: boolean;
   order_items: OrderItem[];
 }
 
