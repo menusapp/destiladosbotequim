@@ -290,6 +290,122 @@ const RestaurantAdmin = () => {
       notifiedOrdersRef.current = storedSet;
     }
 
+    // Shared handler used by INSERT (new order) and UPDATE (scheduled → pending promotion)
+    const handleNewOrderNotification = async (order: any) => {
+      const orderRestaurantId = order.restaurant_id;
+      const orderType = order.order_type;
+      const orderId = order.id;
+      const status = order.status;
+      const activeLocalStatuses = ['pending', 'accepted', 'preparing'];
+      const shouldNotify =
+        status === 'pending' ||
+        (order.order_channel === 'totem' && ['accepted', 'preparing'].includes(status)) ||
+        (order.order_type === 'local' && activeLocalStatuses.includes(status)) ||
+        (order.pdv_source === true && activeLocalStatuses.includes(status));
+
+      const staffRoleLS = localStorage.getItem('staff_role') || '';
+      const receivesRaw = localStorage.getItem('staff_receives_order_notifications');
+      const receivesNotifications = staffRoleLS === 'admin' || receivesRaw === null || receivesRaw === 'true';
+
+      if (orderRestaurantId !== restaurantId || !shouldNotify || !receivesNotifications) return;
+      if (notifiedOrdersRef.current.has(orderId)) return;
+
+      {
+        const updated = new Set(notifiedOrdersRef.current);
+        updated.add(orderId);
+        notifiedOrdersRef.current = updated;
+        try {
+          localStorage.setItem("notifiedGlobalOrders", JSON.stringify(Array.from(updated)));
+        } catch {}
+      }
+
+      await new Promise(r => setTimeout(r, 1500));
+
+      const fetchOrderWithRetry = async (retries = 4): Promise<any> => {
+        const { data: orderData } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            order_items(
+              price_at_order,
+              quantity,
+              order_item_extras(price_at_order, extra_name, product_extras(name))
+            )
+          `)
+          .eq('id', orderId)
+          .single();
+        if (orderData && (!orderData.order_items || orderData.order_items.length === 0) && retries > 0) {
+          await new Promise(r => setTimeout(r, 800));
+          return fetchOrderWithRetry(retries - 1);
+        }
+        return orderData;
+      };
+
+      const orderData = await fetchOrderWithRetry();
+
+      if (orderData) {
+        const itemsTotal = orderData.order_items.reduce((sum: number, item: any) => {
+          const extrasTotal = item.order_item_extras?.reduce((s: number, e: any) => s + e.price_at_order, 0) || 0;
+          return sum + (item.price_at_order + extrasTotal) * item.quantity;
+        }, 0);
+        const total = itemsTotal + (orderData.delivery_fee || 0);
+
+        let tableNumber: number | undefined;
+        if (order.table_id) {
+          const { data: tableData } = await supabase
+            .from('tables')
+            .select('table_number')
+            .eq('id', order.table_id)
+            .single();
+          tableNumber = tableData?.table_number;
+        }
+
+        const { data: orderItems } = await supabase
+          .from('order_items')
+          .select('quantity, products(name)')
+          .eq('order_id', orderId)
+          .limit(5);
+
+        const items = orderItems?.map((oi: any) => ({
+          name: oi.products?.name || 'Item',
+          quantity: oi.quantity,
+        })) || [];
+
+        const newNotification = {
+          orderId: orderId,
+          customerName: order.customer_name,
+          total,
+          orderType: (orderType === 'balcao' ? 'balcao' : orderType === 'delivery' ? 'delivery' : 'local') as 'local' | 'delivery' | 'balcao',
+          tableNumber,
+          deliveryType: order.delivery_type as 'delivery' | 'pickup' | undefined,
+          items,
+        };
+        setNotificationQueue(prev => [...prev, newNotification]);
+
+        try {
+          const { data: printerCfg } = await supabase
+            .from('printer_settings')
+            .select('auto_print_orders')
+            .eq('restaurant_id', restaurantId)
+            .maybeSingle();
+          if (printerCfg?.auto_print_orders) {
+            printDocument(orderData as any, restaurantId, { showToasts: false })
+              .catch(err => console.error('[auto-print] erro:', err));
+          }
+        } catch (err) {
+          console.error('[auto-print] falha ao ler printer_settings:', err);
+        }
+
+        setNotifiedOrders(new Set(notifiedOrdersRef.current));
+      }
+
+      if ((orderType === 'delivery' || orderType === 'balcao') && activeSectionRef.current !== 'pedidos') {
+        setHasNewDeliveryOrders(true);
+      } else if ((orderType === 'local' || !orderType) && activeSectionRef.current !== 'pdv') {
+        setHasNewLocalOrders(true);
+      }
+    };
+
     // Canal para novos pedidos
     const ordersChannel = supabase
       .channel(`new-orders-${restaurantId}`)
@@ -302,145 +418,9 @@ const RestaurantAdmin = () => {
           filter: `restaurant_id=eq.${restaurantId}`,
         },
         async (payload) => {
-          const order = payload.new as any;
-          const orderRestaurantId = order.restaurant_id;
-          const orderType = order.order_type;
-          const orderId = order.id;
-          const status = order.status;
-          // Notify on:
-          // - Any new pending order (delivery / balcão / cardápio mesa)
-          // - Totem orders that come in already accepted/preparing
-          // - Any local (mesa) order regardless of initial status, so PDV/garçom-created
-          //   orders also ping the other staff sessions on the network.
-          const activeLocalStatuses = ['pending', 'accepted', 'preparing'];
-          const shouldNotify =
-            status === 'pending' ||
-            (order.order_channel === 'totem' && ['accepted', 'preparing'].includes(status)) ||
-            (order.order_type === 'local' && activeLocalStatuses.includes(status)) ||
-            (order.pdv_source === true && activeLocalStatuses.includes(status));
-
-          // Filter by staff permission: only show notifications to users that opted in.
-          // Owner sessions (no staff_role set) keep receiving everything.
-          const staffRoleLS = localStorage.getItem('staff_role') || '';
-          const receivesRaw = localStorage.getItem('staff_receives_order_notifications');
-          const receivesNotifications = staffRoleLS === 'admin' || receivesRaw === null || receivesRaw === 'true';
-
-          if (orderRestaurantId === restaurantId && shouldNotify && receivesNotifications) {
-            // Verificar se já foi notificado (usar ref para evitar stale closure)
-            if (notifiedOrdersRef.current.has(orderId)) return;
-
-            // CRÍTICO: marcar IMEDIATAMENTE como notificado (antes de qualquer await),
-            // para que eventos realtime duplicados (reconexão de canal, múltiplas abas,
-            // INSERTs repetidos do Postgres) não disparem múltiplas impressões automáticas
-            // para o mesmo pedido. Persistir em localStorage também é feito agora.
-            {
-              const updated = new Set(notifiedOrdersRef.current);
-              updated.add(orderId);
-              notifiedOrdersRef.current = updated;
-              try {
-                localStorage.setItem("notifiedGlobalOrders", JSON.stringify(Array.from(updated)));
-              } catch {}
-            }
-
-            // Buscar detalhes completos do pedido para calcular total
-            // Delay inicial para garantir que order_items e extras já foram inseridos (race condition)
-            await new Promise(r => setTimeout(r, 1500));
-            
-            const fetchOrderWithRetry = async (retries = 4): Promise<any> => {
-              const { data: orderData } = await supabase
-                .from('orders')
-                .select(`
-                  *,
-                  order_items(
-                    price_at_order,
-                    quantity,
-                    order_item_extras(price_at_order, extra_name, product_extras(name))
-                  )
-                `)
-                .eq('id', orderId)
-                .single();
-              
-              // Se não tem itens, esperar e tentar novamente
-              if (orderData && (!orderData.order_items || orderData.order_items.length === 0) && retries > 0) {
-                await new Promise(r => setTimeout(r, 800));
-                return fetchOrderWithRetry(retries - 1);
-              }
-              return orderData;
-            };
-
-            const orderData = await fetchOrderWithRetry();
-
-            if (orderData) {
-              const itemsTotal = orderData.order_items.reduce((sum: number, item: any) => {
-                const extrasTotal = item.order_item_extras?.reduce((s: number, e: any) => s + e.price_at_order, 0) || 0;
-                return sum + (item.price_at_order + extrasTotal) * item.quantity;
-              }, 0);
-              const total = itemsTotal + (orderData.delivery_fee || 0);
-
-              // Buscar número da mesa para pedidos locais
-              let tableNumber: number | undefined;
-              if (order.table_id) {
-                const { data: tableData } = await supabase
-                  .from('tables')
-                  .select('table_number')
-                  .eq('id', order.table_id)
-                  .single();
-                tableNumber = tableData?.table_number;
-              }
-
-              // Fetch order items for notification preview
-              const { data: orderItems } = await supabase
-                .from('order_items')
-                .select('quantity, products(name)')
-                .eq('order_id', orderId)
-                .limit(5);
-
-              const items = orderItems?.map((oi: any) => ({
-                name: oi.products?.name || 'Item',
-                quantity: oi.quantity,
-              })) || [];
-
-              // Add to notification queue
-              const newNotification = {
-                orderId: orderId,
-                customerName: order.customer_name,
-                total,
-                orderType: (orderType === 'balcao' ? 'balcao' : orderType === 'delivery' ? 'delivery' : 'local') as 'local' | 'delivery' | 'balcao',
-                tableNumber,
-                deliveryType: order.delivery_type as 'delivery' | 'pickup' | undefined,
-                items,
-              };
-              setNotificationQueue(prev => [...prev, newNotification]);
-
-              // Auto-print on PC accounts (those with notifications enabled).
-              // Trigger só dispara aqui — o dispositivo do garçom (com notificações
-              // desativadas) não chega a executar este bloco.
-              try {
-                const { data: printerCfg } = await supabase
-                  .from('printer_settings')
-                  .select('auto_print_orders')
-                  .eq('restaurant_id', restaurantId)
-                  .maybeSingle();
-                if (printerCfg?.auto_print_orders) {
-                  printDocument(orderData as any, restaurantId, { showToasts: false })
-                    .catch(err => console.error('[auto-print] erro:', err));
-                }
-              } catch (err) {
-                console.error('[auto-print] falha ao ler printer_settings:', err);
-              }
-
-              // Sincronizar state do React (a ref + localStorage já foram atualizados
-              // no início do handler, antes dos awaits, para deduplicar corretamente).
-              setNotifiedOrders(new Set(notifiedOrdersRef.current));
-            }
-
-            // Atualizar badges da sidebar
-            if ((orderType === 'delivery' || orderType === 'balcao') && activeSectionRef.current !== 'pedidos') {
-              setHasNewDeliveryOrders(true);
-            } else if ((orderType === 'local' || !orderType) && activeSectionRef.current !== 'pdv') {
-              setHasNewLocalOrders(true);
-            }
-          }
+          // Scheduled iFood orders enter with status='scheduled' and must NOT
+          // trigger sound/popup until the scheduler promotes them to 'pending'.
+          await handleNewOrderNotification(payload.new);
         }
       )
       .on(
@@ -451,10 +431,17 @@ const RestaurantAdmin = () => {
           table: 'orders',
           filter: `restaurant_id=eq.${restaurantId}`,
         },
-        (payload) => {
+        async (payload) => {
           const order = payload.new as any;
           const orderId = order.id;
           const status = order.status;
+
+          // Promotion of a previously-scheduled order: fire the regular new-order flow.
+          if (status === 'pending' && !notifiedOrdersRef.current.has(orderId)) {
+            await handleNewOrderNotification(order);
+            return;
+          }
+
           const keepTotemNotification = order.order_channel === 'totem' && ['accepted', 'preparing'].includes(status);
           const keepLocalNotification = order.order_type === 'local' && ['pending', 'accepted', 'preparing'].includes(status);
 
@@ -464,6 +451,7 @@ const RestaurantAdmin = () => {
         }
       )
       .subscribe();
+
 
     // Canal para novas contas
     const billsChannel = supabase
