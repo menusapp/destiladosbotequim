@@ -273,6 +273,8 @@ export default function OrderConfirmation() {
   };
 
   const calculateServiceFee = () => {
+    // iFood/external orders carry their own marketplace service fee in `service_fee`.
+    if (order?.service_fee && order.service_fee > 0) return order.service_fee;
     if (!restaurant?.service_fee_enabled) return 0;
     return calculateSubtotal() * (restaurant.service_fee_percentage / 100);
   };
