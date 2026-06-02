@@ -51,6 +51,7 @@ export interface OrderCardOrder {
   tables?: { table_number: number };
   order_items: OrderItem[];
   delivery_fee?: number;
+  service_fee?: number;
   coupon_discount?: number;
   loyalty_points_used?: number;
   ifood_source?: boolean;
@@ -191,6 +192,9 @@ const OrderCardBase = ({
         </div>
         {(order.delivery_fee ?? 0) > 0 && (
           <div className="text-[10px] text-muted-foreground">Taxa entrega: R$ {order.delivery_fee!.toFixed(2)}</div>
+        )}
+        {(order.service_fee ?? 0) > 0 && (
+          <div className="text-[10px] text-muted-foreground">Taxa de serviço: R$ {order.service_fee!.toFixed(2)}</div>
         )}
         <div className="flex items-center justify-between pt-1 border-t border-border/30">
           <span className="text-xs text-muted-foreground">{format(new Date(order.created_at), "HH:mm")}</span>

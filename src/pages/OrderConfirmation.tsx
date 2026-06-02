@@ -43,6 +43,8 @@ interface Order {
   loyalty_points_used: number;
   restaurant_id: string;
   delivery_type?: string;
+  service_fee?: number;
+  ifood_source?: boolean;
   order_items: OrderItem[];
 }
 
@@ -271,6 +273,8 @@ export default function OrderConfirmation() {
   };
 
   const calculateServiceFee = () => {
+    // iFood/external orders carry their own marketplace service fee in `service_fee`.
+    if (order?.service_fee && order.service_fee > 0) return order.service_fee;
     if (!restaurant?.service_fee_enabled) return 0;
     return calculateSubtotal() * (restaurant.service_fee_percentage / 100);
   };
@@ -449,7 +453,12 @@ export default function OrderConfirmation() {
                   <span>Taxa de entrega</span>
                   <span>R$ {order.delivery_fee.toFixed(2)}</span>
                 </div>
-                {restaurant.service_fee_enabled && (
+                {(order.service_fee ?? 0) > 0 ? (
+                  <div className="flex justify-between">
+                    <span>Taxa de serviço</span>
+                    <span>R$ {calculateServiceFee().toFixed(2)}</span>
+                  </div>
+                ) : restaurant.service_fee_enabled && (
                   <div className="flex justify-between">
                     <span>Taxa de serviço ({restaurant.service_fee_percentage}%)</span>
                     <span>R$ {calculateServiceFee().toFixed(2)}</span>

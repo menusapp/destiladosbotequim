@@ -292,7 +292,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select(`id, daily_order_number, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, payment_brand, delivery_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name)))`)
+      .select(`id, daily_order_number, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, payment_brand, delivery_fee, service_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name)))`)
       .eq("restaurant_id", restaurantId)
       .in("order_type", ["delivery", "balcao"])
       .gte("created_at", dateRange.from.toISOString())
@@ -411,7 +411,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
 
   const renderOrderCard = (order: Order) => {
     const total = calculateTotal(order);
-    const grandTotal = total + (order.delivery_fee ?? 0) - (order.coupon_discount ?? 0) - (order.loyalty_points_used ?? 0);
+    const grandTotal = total + (order.delivery_fee ?? 0) + ((order as any).service_fee ?? 0) - (order.coupon_discount ?? 0) - (order.loyalty_points_used ?? 0);
     const elapsed = getElapsedMinutes(order.created_at);
     const payment = getPaymentDisplay(order.payment_type, order.payment_brand);
     const next = getNextStatus(order);
