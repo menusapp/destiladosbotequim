@@ -377,6 +377,7 @@ Deno.serve(async (req) => {
           }
           if (isPickup) noteParts.push("RETIRADA NO LOCAL");
           if (deliveryFeeNum > 0) noteParts.push(`Taxa de entrega: iFood (R$ ${deliveryFeeNum.toFixed(2)})`);
+          if (serviceFeeNum > 0) noteParts.push(`Taxa de serviço iFood: R$ ${serviceFeeNum.toFixed(2)}`);
           if (changeFor != null && changeFor > 0) noteParts.push(`TROCO PARA R$ ${changeFor.toFixed(2)}`);
           if (couponDiscount > 0) noteParts.push(`Voucher${couponCode ? ` (${couponCode})` : ""}: -R$ ${couponDiscount.toFixed(2)}`);
           if (customerObservation) noteParts.push(`Obs.: ${customerObservation}`);
