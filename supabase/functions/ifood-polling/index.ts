@@ -399,6 +399,7 @@ Deno.serve(async (req) => {
               delivery_address: isPickup ? null : deliveryAddress,
               delivery_phone: customerPhone,
               delivery_fee: isPickup ? 0 : deliveryFeeNum,
+              service_fee: serviceFeeNum,
               payment_type: paymentType,
               ifood_order_id: orderId,
               ifood_source: true,
