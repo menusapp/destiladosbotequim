@@ -253,13 +253,38 @@ Deno.serve(async (req) => {
           const deliveryTypeValue = isPickup ? "pickup" : "delivery";
 
           // ── Scheduled order ────────────────────────────────────────────
+          // iFood pode entregar a janela agendada em diversos campos dependendo
+          // da versão da API. Capturamos TODOS os candidatos conhecidos.
           const ifoodTiming = String(orderData.orderTiming || "").toUpperCase();
           const scheduledFor =
             orderData.schedule?.deliveryDateTime ||
             orderData.schedule?.scheduledDateTimeStart ||
+            orderData.schedule?.windowStartTime ||
+            orderData.schedule?.windowStart ||
+            orderData.schedule?.startDateTime ||
             orderData.scheduledDateTime ||
+            orderData.delivery?.deliveryDateTime ||
+            orderData.delivery?.pickupDateTime ||
+            orderData.delivery?.targetTime ||
             null;
           const isScheduled = ifoodTiming === "SCHEDULED" || !!scheduledFor;
+
+          // Log detalhado para diagnóstico de homologação iFood
+          console.log("[ifood-polling] scheduled-detection", JSON.stringify({
+            orderId,
+            orderTiming: orderData.orderTiming ?? null,
+            schedule: orderData.schedule ?? null,
+            scheduledDateTime: orderData.scheduledDateTime ?? null,
+            deliveryDateTime: orderData.delivery?.deliveryDateTime ?? null,
+            pickupDateTime: orderData.delivery?.pickupDateTime ?? null,
+            targetTime: orderData.delivery?.targetTime ?? null,
+            resolvedScheduledFor: scheduledFor,
+            isScheduled,
+            timezone: "America/Sao_Paulo",
+            decision: isScheduled
+              ? "TRATADO COMO AGENDADO (status=scheduled)"
+              : "TRATADO COMO IMEDIATO (status=pending) — nenhum campo de agendamento detectado",
+          }));
 
           // ── Voucher / coupon discount ──────────────────────────────────
           let couponCode: string | null = null;
