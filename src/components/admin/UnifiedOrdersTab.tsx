@@ -338,6 +338,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
 
   const groupedOrders = useMemo(() => {
     return {
+      scheduled: filteredOrders.filter(o => o.status === "scheduled"),
       pending: filteredOrders.filter(o => o.status === "pending"),
       preparing: filteredOrders.filter(o => ["accepted", "preparing"].includes(o.status)),
       out: filteredOrders.filter(o => ["out_for_delivery", "ready"].includes(o.status)),
