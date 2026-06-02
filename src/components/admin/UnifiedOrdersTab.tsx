@@ -411,7 +411,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
 
   const renderOrderCard = (order: Order) => {
     const total = calculateTotal(order);
-    const grandTotal = total + (order.delivery_fee ?? 0) - (order.coupon_discount ?? 0) - (order.loyalty_points_used ?? 0);
+    const grandTotal = total + (order.delivery_fee ?? 0) + ((order as any).service_fee ?? 0) - (order.coupon_discount ?? 0) - (order.loyalty_points_used ?? 0);
     const elapsed = getElapsedMinutes(order.created_at);
     const payment = getPaymentDisplay(order.payment_type, order.payment_brand);
     const next = getNextStatus(order);
