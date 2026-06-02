@@ -375,6 +375,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
   };
 
   const kanbanColumns = [
+    { key: "scheduled", title: "Aguardando Agendamento", color: "bg-amber-500", count: groupedOrders.scheduled.length, icon: <CalendarClock className="w-3.5 h-3.5" /> },
     { key: "pending", title: "Aguardando", color: "bg-orange-400", count: groupedOrders.pending.length },
     { key: "preparing", title: "Preparando", color: "bg-orange-500", count: groupedOrders.preparing.length },
     { key: "out", title: "Saiu / Pronto", color: "bg-orange-600", count: groupedOrders.out.length },
