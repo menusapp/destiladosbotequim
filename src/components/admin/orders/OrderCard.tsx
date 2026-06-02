@@ -51,6 +51,7 @@ export interface OrderCardOrder {
   tables?: { table_number: number };
   order_items: OrderItem[];
   delivery_fee?: number;
+  service_fee?: number;
   coupon_discount?: number;
   loyalty_points_used?: number;
   ifood_source?: boolean;
