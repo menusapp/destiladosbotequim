@@ -2592,6 +2592,7 @@ export type Database = {
           restaurant_id: string
           reward_discount: number | null
           reward_id: string | null
+          service_fee: number
           status: string | null
           table_id: string | null
           updated_at: string | null
@@ -2631,6 +2632,7 @@ export type Database = {
           restaurant_id: string
           reward_discount?: number | null
           reward_id?: string | null
+          service_fee?: number
           status?: string | null
           table_id?: string | null
           updated_at?: string | null
@@ -2670,6 +2672,7 @@ export type Database = {
           restaurant_id?: string
           reward_discount?: number | null
           reward_id?: string | null
+          service_fee?: number
           status?: string | null
           table_id?: string | null
           updated_at?: string | null
