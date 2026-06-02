@@ -247,6 +247,31 @@ Deno.serve(async (req) => {
             ?? 0;
           const deliveryFeeNum = typeof deliveryFee === 'object' ? (deliveryFee?.value || 0) : (deliveryFee || 0);
 
+          // ── Service fee / additional fees (Taxa de serviço iFood) ───────
+          // iFood envia em `otherFees[]` (com `type`/`name` contendo SERVICE)
+          // ou agregado em `total.additionalFees`. Capturamos as duas fontes,
+          // somando taxas adicionais que NÃO sejam a taxa de entrega.
+          let serviceFeeNum = 0;
+          const otherFees = Array.isArray(orderData.otherFees) ? orderData.otherFees : [];
+          for (const f of otherFees) {
+            const fType = String(f?.type || f?.name || "").toUpperCase();
+            const fVal = Number(f?.value ?? 0);
+            if (!Number.isFinite(fVal) || fVal <= 0) continue;
+            if (fType.includes("DELIVERY")) continue; // já contabilizada
+            serviceFeeNum += fVal;
+          }
+          if (serviceFeeNum === 0) {
+            const addFees = Number(orderData.total?.additionalFees ?? 0);
+            if (Number.isFinite(addFees) && addFees > 0) serviceFeeNum = addFees;
+          }
+          console.log("[ifood-polling] fees", JSON.stringify({
+            orderId,
+            deliveryFee: deliveryFeeNum,
+            serviceFee: serviceFeeNum,
+            total: orderData.total ?? null,
+            otherFees,
+          }));
+
           // ── Order type: DELIVERY vs TAKEOUT/INDOOR (pickup) ─────────────
           const ifoodOrderType = String(orderData.orderType || "DELIVERY").toUpperCase();
           const isPickup = ifoodOrderType === "TAKEOUT" || ifoodOrderType === "INDOOR";
