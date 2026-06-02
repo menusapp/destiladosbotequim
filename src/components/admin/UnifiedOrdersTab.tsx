@@ -11,7 +11,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   CalendarIcon, Search, Truck, ShoppingBag, UtensilsCrossed, Package, Store,
-  Printer, AlertTriangle, CreditCard, Banknote, Smartphone, Zap
+  Printer, AlertTriangle, CreditCard, Banknote, Smartphone, Zap, CalendarClock
 } from "lucide-react";
 import { useOrderStatusAdvance, getNextStatus } from "@/hooks/useOrderStatusAdvance";
 import { toast } from "@/components/ui/sonner";
