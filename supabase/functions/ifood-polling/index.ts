@@ -390,11 +390,37 @@ Deno.serve(async (req) => {
           const customerCpf = orderData.customer?.documentNumber || "Não informado";
 
           // ── Customer observations / order notes from iFood ─────────────
-          const customerObservation =
+          // iFood pode enviar a observação do cliente em vários campos
+          // dependendo do canal/integração. Tentamos todos em cascata.
+          const itemObs = Array.isArray(orderData.items)
+            ? orderData.items
+                .map((it: any) => it?.observations || it?.observation || "")
+                .filter((s: string) => s && s.trim().length > 0)
+                .join(" | ")
+            : "";
+          const customerObservation = String(
             orderData.observations ||
-            orderData.extraInfo ||
-            orderData.customer?.observations ||
-            "";
+              orderData.extraInfo ||
+              orderData.extra_info ||
+              orderData.note ||
+              orderData.notes ||
+              orderData.comments ||
+              orderData.customer?.observations ||
+              orderData.customer?.note ||
+              orderData.delivery?.observations ||
+              orderData.delivery?.note ||
+              itemObs ||
+              ""
+          ).trim();
+
+          // ── Audit log (iFood) ─────────────────────────────────────────
+          console.log("[ifood-polling][audit][customer]", {
+            orderId,
+            cpf: customerCpf,
+            paymentType,
+            changeFor,
+            observation: customerObservation || "(vazio)",
+          });
 
           // ── Build notes with delivery fee origin + scheduling + change + obs ──
           const noteParts: string[] = [`Pedido iFood #${orderId.slice(0, 8)}`];
@@ -407,7 +433,8 @@ Deno.serve(async (req) => {
           if (isPickup) noteParts.push("RETIRADA NO LOCAL");
           if (deliveryFeeNum > 0) noteParts.push(`Taxa de entrega: iFood (R$ ${deliveryFeeNum.toFixed(2)})`);
           if (serviceFeeNum > 0) noteParts.push(`Taxa de serviço iFood: R$ ${serviceFeeNum.toFixed(2)}`);
-          if (changeFor != null && changeFor > 0) noteParts.push(`TROCO PARA R$ ${changeFor.toFixed(2)}`);
+          // Formato padrão reconhecido por parseChangeFor() no frontend ("Troco para: R$ X,YY")
+          if (changeFor != null && changeFor > 0) noteParts.push(`Troco para: R$ ${changeFor.toFixed(2)}`);
           if (couponDiscount > 0) noteParts.push(`Voucher${couponCode ? ` (${couponCode})` : ""}: -R$ ${couponDiscount.toFixed(2)}`);
           if (customerObservation) noteParts.push(`Obs.: ${customerObservation}`);
           const orderNotes = noteParts.join(" | ");
