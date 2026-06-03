@@ -588,8 +588,20 @@ Deno.serve(async (req) => {
 
                 console.log(`[ifood-polling]   PRICING: raw=R$${rawUnitPrice.toFixed(2)}, extras=R$${totalExtrasPrice.toFixed(2)}, adjusted=R$${adjustedUnitPrice.toFixed(2)}, matched=${matchedProductId ? "YES" : "NO"}, extras_count=${collectedExtras.length}`);
 
-                // Only put item name in notes if product was NOT matched
-                const itemNotes = matchedProductId ? null : `[iFood] ${itemName}`;
+                // Per-item observation from iFood (sem cebola, bem passado, etc.)
+                const perItemObs = String(
+                  item.observations || item.observation || item.notes || item.comments || ""
+                ).trim();
+
+                // Compor notes do item: prefixo [iFood] quando produto não casou + observação do cliente
+                const notesParts: string[] = [];
+                if (!matchedProductId) notesParts.push(`[iFood] ${itemName}`);
+                if (perItemObs) notesParts.push(perItemObs);
+                const itemNotes = notesParts.length > 0 ? notesParts.join(" — ") : null;
+
+                if (perItemObs) {
+                  console.log(`[ifood-polling][audit][item-obs] "${itemName}": ${perItemObs}`);
+                }
 
                 insertItems.push({
                   itemData: {
