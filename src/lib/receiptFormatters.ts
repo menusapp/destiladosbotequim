@@ -129,10 +129,23 @@ export function buildOriginLabel(order: {
  */
 export function parseChangeFor(notes: string | null | undefined): number | null {
   if (!notes) return null;
-  // Aceita "Troco para: R$ X,YY" (cardápio) e "TROCO PARA R$ X,YY" (legado iFood)
+  // Aceita "Troco para: R$ X,YY" (cardápio/BR), "TROCO PARA R$ X,YY" (legado iFood)
+  // e "Troco para: R$ X.YY" (iFood já persistido com toFixed → ponto como decimal).
   const m = notes.match(/Troco\s*para[:\s]+R?\$?\s*([\d.,]+)/i);
   if (!m) return null;
-  const num = parseFloat(m[1].replace(/\./g, "").replace(",", "."));
+  const raw = m[1];
+  let normalized: string;
+  if (raw.includes(",")) {
+    // BR: pontos são milhares, vírgula é decimal → "1.234,56" → 1234.56
+    normalized = raw.replace(/\./g, "").replace(",", ".");
+  } else if ((raw.match(/\./g) || []).length === 1) {
+    // US/JS: único ponto é decimal → "100.00" → 100.00
+    normalized = raw;
+  } else {
+    // Múltiplos pontos sem vírgula → milhares → remove todos
+    normalized = raw.replace(/\./g, "");
+  }
+  const num = parseFloat(normalized);
   return Number.isFinite(num) && num > 0 ? num : null;
 }
 
