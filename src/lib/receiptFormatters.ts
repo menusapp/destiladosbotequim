@@ -129,21 +129,48 @@ export function buildOriginLabel(order: {
  */
 export function parseChangeFor(notes: string | null | undefined): number | null {
   if (!notes) return null;
-  const m = notes.match(/Troco para:\s*R?\$?\s*([\d.,]+)/i);
+  // Aceita "Troco para: R$ X,YY" (cardápio) e "TROCO PARA R$ X,YY" (legado iFood)
+  const m = notes.match(/Troco\s*para[:\s]+R?\$?\s*([\d.,]+)/i);
   if (!m) return null;
   const num = parseFloat(m[1].replace(/\./g, "").replace(",", "."));
   return Number.isFinite(num) && num > 0 ? num : null;
 }
 
 /**
- * Remove o tag "[Desconto: ...]" e a linha de "Troco para: R$ X" das observações,
- * já que ambos são exibidos em blocos próprios no cupom.
+ * Extrai a observação do cliente das notas do pedido.
+ * - Pedidos iFood/DD: notas são uma string com partes separadas por " | ".
+ *   A observação aparece como "Obs.: <texto>".
+ * - Pedidos do cardápio: notas costumam conter apenas o texto puro,
+ *   eventualmente com "[Desconto:...]" ou "Troco para: R$ X" — esses são removidos.
+ */
+export function parseCustomerObservation(notes: string | null | undefined): string {
+  if (!notes) return "";
+  // Caso iFood/DD: extrair apenas o trecho "Obs.: ..."
+  const m = notes.match(/Obs\.?:\s*([^|]+?)(?:\s*\||\s*$)/i);
+  if (m) return m[1].trim();
+  // Caso pedido com partes meta separadas por "|" mas sem "Obs.:" → não há observação
+  if (/^Pedido (iFood|DD)/i.test(notes) || notes.includes(" | ")) return "";
+  // Caso pedido normal do cardápio: limpar metadados e devolver
+  return cleanReceiptNotes(notes);
+}
+
+/**
+ * Remove o tag "[Desconto: ...]", a linha de "Troco para: R$ X" e
+ * os metadados injetados em pedidos iFood/DD (separados por " | ").
  */
 export function cleanReceiptNotes(notes: string | null | undefined): string {
   if (!notes) return "";
-  return notes
-    .replace(/\[Desconto:.+?\]/g, "")
-    .replace(/Troco para:\s*R?\$?\s*[\d.,]+/gi, "")
-    .replace(/\s{2,}/g, " ")
-    .trim();
+  let s = notes;
+  s = s.replace(/Pedido (iFood|DD) #[a-z0-9-]+/gi, "");
+  s = s.replace(/AGENDADO:[^|]*/gi, "");
+  s = s.replace(/RETIRADA NO LOCAL/gi, "");
+  s = s.replace(/Taxa de entrega:[^|]*/gi, "");
+  s = s.replace(/Taxa de servi[cç]o[^|]*/gi, "");
+  s = s.replace(/Troco\s*para[:\s]+R?\$?\s*[\d.,]+/gi, "");
+  s = s.replace(/Voucher[^|]*/gi, "");
+  s = s.replace(/\[Desconto:.+?\]/g, "");
+  s = s.replace(/Obs\.?:\s*/i, "");
+  // Limpa pipes vazios resultantes
+  s = s.split("|").map((p) => p.trim()).filter(Boolean).join(" | ");
+  return s.replace(/\s{2,}/g, " ").trim();
 }

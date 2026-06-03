@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { formatPaymentForDisplay } from "@/lib/utils";
 import { getOrderOriginLabel } from "@/lib/orderOrigin";
-import { parseChangeFor } from "@/lib/receiptFormatters";
+import { parseChangeFor, parseCustomerObservation } from "@/lib/receiptFormatters";
 import { useOrderStatusAdvance } from "@/hooks/useOrderStatusAdvance";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -513,6 +513,16 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                 {order.delivery_address && (
                   <div><p className="text-sm text-muted-foreground">Endereço:</p><p className="font-medium flex items-start gap-2"><MapPin className="w-4 h-4 mt-1" /><span>{order.delivery_address}</span></p></div>
                 )}
+                {(() => {
+                  const obs = parseCustomerObservation(order.notes);
+                  if (!obs) return null;
+                  return (
+                    <div>
+                      <p className="text-sm text-muted-foreground">Observação:</p>
+                      <p className="font-medium whitespace-pre-wrap">{obs}</p>
+                    </div>
+                  );
+                })()}
               </div>
             </CollapsibleContent>
           </Collapsible>
