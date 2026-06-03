@@ -248,29 +248,60 @@ Deno.serve(async (req) => {
           const deliveryFeeNum = typeof deliveryFee === 'object' ? (deliveryFee?.value || 0) : (deliveryFee || 0);
 
           // ── Service fee / additional fees (Taxa de serviço iFood) ───────
-          // iFood envia em `otherFees[]` (com `type`/`name` contendo SERVICE)
-          // ou agregado em `total.additionalFees`. Capturamos as duas fontes,
-          // somando taxas adicionais que NÃO sejam a taxa de entrega.
-          let serviceFeeNum = 0;
+          // Ordem de extração (a primeira fonte com valor > 0 vence):
+          //   1) additionalFees[] (array top-level, detalhado por taxa)
+          //   2) total.additionalFees (agregado)
+          //   3) otherFees[] (compatibilidade com payloads antigos)
+          // Sempre ignora entradas cujo type/name contenha DELIVERY.
+          const sumNonDelivery = (arr: any[]): number => {
+            let s = 0;
+            for (const f of arr || []) {
+              const fType = String(f?.type || f?.name || "").toUpperCase();
+              const fVal = Number(f?.value ?? 0);
+              if (!Number.isFinite(fVal) || fVal <= 0) continue;
+              if (fType.includes("DELIVERY")) continue;
+              s += fVal;
+            }
+            return s;
+          };
+          const additionalFeesArr = Array.isArray(orderData.additionalFees) ? orderData.additionalFees : [];
           const otherFees = Array.isArray(orderData.otherFees) ? orderData.otherFees : [];
-          for (const f of otherFees) {
-            const fType = String(f?.type || f?.name || "").toUpperCase();
-            const fVal = Number(f?.value ?? 0);
-            if (!Number.isFinite(fVal) || fVal <= 0) continue;
-            if (fType.includes("DELIVERY")) continue; // já contabilizada
-            serviceFeeNum += fVal;
-          }
-          if (serviceFeeNum === 0) {
+          let serviceFeeNum = sumNonDelivery(additionalFeesArr);
+          if (serviceFeeNum <= 0) {
             const addFees = Number(orderData.total?.additionalFees ?? 0);
             if (Number.isFinite(addFees) && addFees > 0) serviceFeeNum = addFees;
           }
-          console.log("[ifood-polling] fees", JSON.stringify({
+          if (serviceFeeNum <= 0) serviceFeeNum = sumNonDelivery(otherFees);
+
+          // ── Auditoria financeira ────────────────────────────────────────
+          const couponDiscountAudit = Number(orderData.total?.benefits ?? 0) || 0;
+          const ifoodOrderAmount = Number(orderData.total?.orderAmount ?? 0);
+          const itemsSubtotal = (orderData.items || []).reduce(
+            (acc: number, it: any) => acc + (Number(it?.totalPrice ?? it?.price ?? 0) || 0),
+            0,
+          );
+          const menusAppTotal = +(itemsSubtotal + deliveryFeeNum + serviceFeeNum - couponDiscountAudit).toFixed(2);
+          console.log("[ifood-polling][audit]", JSON.stringify({
             orderId,
-            deliveryFee: deliveryFeeNum,
-            serviceFee: serviceFeeNum,
-            total: orderData.total ?? null,
-            otherFees,
+            delivery_fee: deliveryFeeNum,
+            service_fee: serviceFeeNum,
+            coupon_discount: couponDiscountAudit,
+            orderAmount_ifood: ifoodOrderAmount,
+            total_menusapp: menusAppTotal,
+            sources: {
+              additionalFees_top: additionalFeesArr,
+              total_additionalFees: orderData.total?.additionalFees ?? null,
+              otherFees,
+            },
           }));
+          if (ifoodOrderAmount > 0 && Math.abs(ifoodOrderAmount - menusAppTotal) > 0.01) {
+            console.warn("[ifood-polling][audit][WARNING] divergência > R$0,01 entre orderAmount iFood e total MenusApp", JSON.stringify({
+              orderId,
+              diff: +(ifoodOrderAmount - menusAppTotal).toFixed(2),
+              ifood: ifoodOrderAmount,
+              menusapp: menusAppTotal,
+            }));
+          }
 
           // ── Order type: DELIVERY vs TAKEOUT/INDOOR (pickup) ─────────────
           const ifoodOrderType = String(orderData.orderType || "DELIVERY").toUpperCase();
