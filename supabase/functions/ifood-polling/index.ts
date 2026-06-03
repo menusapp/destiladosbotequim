@@ -309,21 +309,22 @@ Deno.serve(async (req) => {
           const deliveryTypeValue = isPickup ? "pickup" : "delivery";
 
           // ── Scheduled order ────────────────────────────────────────────
-          // iFood pode entregar a janela agendada em diversos campos dependendo
-          // da versão da API. Capturamos TODOS os candidatos conhecidos.
+          // IMPORTANTE: o iFood envia `delivery.deliveryDateTime` (ETA) em TODOS
+          // os pedidos, inclusive imediatos. A única fonte confiável para saber
+          // se é agendado é `orderTiming === "SCHEDULED"`. Só depois disso
+          // capturamos a janela em `schedule.*` (ou fallback de ETA).
           const ifoodTiming = String(orderData.orderTiming || "").toUpperCase();
-          const scheduledFor =
-            orderData.schedule?.deliveryDateTime ||
-            orderData.schedule?.scheduledDateTimeStart ||
-            orderData.schedule?.windowStartTime ||
-            orderData.schedule?.windowStart ||
-            orderData.schedule?.startDateTime ||
-            orderData.scheduledDateTime ||
-            orderData.delivery?.deliveryDateTime ||
-            orderData.delivery?.pickupDateTime ||
-            orderData.delivery?.targetTime ||
-            null;
-          const isScheduled = ifoodTiming === "SCHEDULED" || !!scheduledFor;
+          const isScheduled = ifoodTiming === "SCHEDULED";
+          const scheduledFor = isScheduled
+            ? (orderData.schedule?.deliveryDateTime ||
+               orderData.schedule?.scheduledDateTimeStart ||
+               orderData.schedule?.windowStartTime ||
+               orderData.schedule?.windowStart ||
+               orderData.schedule?.startDateTime ||
+               orderData.scheduledDateTime ||
+               orderData.delivery?.deliveryDateTime ||
+               null)
+            : null;
 
           // Log detalhado para diagnóstico de homologação iFood
           console.log("[ifood-polling] scheduled-detection", JSON.stringify({
@@ -332,14 +333,11 @@ Deno.serve(async (req) => {
             schedule: orderData.schedule ?? null,
             scheduledDateTime: orderData.scheduledDateTime ?? null,
             deliveryDateTime: orderData.delivery?.deliveryDateTime ?? null,
-            pickupDateTime: orderData.delivery?.pickupDateTime ?? null,
-            targetTime: orderData.delivery?.targetTime ?? null,
             resolvedScheduledFor: scheduledFor,
             isScheduled,
-            timezone: "America/Sao_Paulo",
             decision: isScheduled
               ? "TRATADO COMO AGENDADO (status=scheduled)"
-              : "TRATADO COMO IMEDIATO (status=pending) — nenhum campo de agendamento detectado",
+              : "TRATADO COMO IMEDIATO (orderTiming != SCHEDULED)",
           }));
 
           // ── Voucher / coupon discount ──────────────────────────────────
