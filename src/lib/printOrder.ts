@@ -59,6 +59,7 @@ export const printOrder = async (
     cancellation_reason?: string;
     coupon_discount?: number;
     delivery_fee?: number;
+    service_fee?: number;
     order_channel?: string;
     customer_cpf?: string;
     order_items: {
@@ -242,11 +243,11 @@ export const printOrder = async (
   const totalsHtml = (() => {
     const discount = order.coupon_discount || 0;
     const deliveryFee = order.delivery_fee || 0;
-    const finalTotal = subtotal - discount + deliveryFee;
+    const serviceFee = order.service_fee || 0;
+    const finalTotal = subtotal - discount + deliveryFee + serviceFee;
     const discountReasonMatch = order.notes?.match(/\[Desconto: (.+?)\]/);
     const discountReason = discountReasonMatch ? discountReasonMatch[1] : "";
-    // Sempre mostra breakdown para entrega, mesmo com taxa 0 (transparência)
-    const showBreakdown = discount > 0 || deliveryFee > 0 || isDelivery;
+    const showBreakdown = discount > 0 || deliveryFee > 0 || serviceFee > 0 || isDelivery;
     if (showBreakdown) {
       return `
         <div class="total-row" style="font-size:12px;">
@@ -265,6 +266,10 @@ export const printOrder = async (
           <span>Taxa de entrega</span>
           <span>R$ ${deliveryFee.toFixed(2)}</span>
         </div>` : "")}
+        ${serviceFee > 0 ? `<div class="total-row" style="font-size:12px;">
+          <span>Taxa de serviço</span>
+          <span>R$ ${serviceFee.toFixed(2)}</span>
+        </div>` : ""}
         <div class="total-row">
           <span>TOTAL</span>
           <span>R$ ${finalTotal.toFixed(2)}</span>
