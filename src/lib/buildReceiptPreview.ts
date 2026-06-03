@@ -223,9 +223,10 @@ function buildCustomerPreview(
   // Totais (mesmo breakdown do PDF)
   const discount = order.coupon_discount || 0;
   const deliveryFee = order.delivery_fee || 0;
-  const finalTotal = subtotal - discount + deliveryFee;
+  const serviceFee = order.service_fee || 0;
+  const finalTotal = subtotal - discount + deliveryFee + serviceFee;
   const isDelivery = order.delivery_type === "delivery";
-  const showBreakdown = discount > 0 || deliveryFee > 0 || isDelivery;
+  const showBreakdown = discount > 0 || deliveryFee > 0 || serviceFee > 0 || isDelivery;
 
   if (showBreakdown) {
     out += lineLR("Subtotal", formatPrice(subtotal), width);
@@ -240,6 +241,9 @@ function buildCustomerPreview(
       );
     } else if (deliveryFee > 0) {
       out += lineLR("Taxa de entrega", formatPrice(deliveryFee), width);
+    }
+    if (serviceFee > 0) {
+      out += lineLR("Taxa de servico", formatPrice(serviceFee), width);
     }
   }
 

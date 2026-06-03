@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
       try {
         const { data: order } = await supabase
           .from('orders')
-          .select('id, delivery_fee, coupon_discount, delivery_address, delivery_type, order_type, notes')
+          .select('id, delivery_fee, service_fee, coupon_discount, delivery_address, delivery_type, order_type, notes')
           .eq('id', orderId)
           .maybeSingle();
 
@@ -182,13 +182,15 @@ Deno.serve(async (req) => {
         });
 
         const deliveryFee = Number(order?.delivery_fee || 0);
+        const serviceFee = Number((order as any)?.service_fee || 0);
         const discount = Number(order?.coupon_discount || 0);
-        const total = subtotal + deliveryFee - discount;
+        const total = subtotal + deliveryFee + serviceFee - discount;
 
-        if (deliveryFee > 0 || discount > 0) {
+        if (deliveryFee > 0 || serviceFee > 0 || discount > 0) {
           lines.push('');
           lines.push(`Subtotal: ${fmt(subtotal)}`);
           if (deliveryFee > 0) lines.push(`🚚 Taxa de entrega: ${fmt(deliveryFee)}`);
+          if (serviceFee > 0) lines.push(`🧾 Taxa de serviço: ${fmt(serviceFee)}`);
           if (discount > 0) lines.push(`🎟️ Desconto: -${fmt(discount)}`);
         }
 

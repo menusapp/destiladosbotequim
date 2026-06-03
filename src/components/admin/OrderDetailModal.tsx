@@ -57,6 +57,7 @@ interface Order {
   tables?: { table_number: number };
   order_items: OrderItem[];
   delivery_fee?: number;
+  service_fee?: number;
   coupon_discount?: number;
   loyalty_points_used?: number;
   ifood_source?: boolean;
@@ -99,7 +100,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   const refreshOrder = useCallback(async () => {
     const { data, error } = await supabase
       .from("orders")
-      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, payment_brand, delivery_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name)))`)
+      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, payment_brand, delivery_fee, service_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name)))`)
       .eq("id", order.id)
       .single();
     if (!error && data) {
@@ -265,7 +266,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
     toast.success("Forma de pagamento atualizada!");
   };
 
-  const grandTotal = calculateTotal() + (order.delivery_fee ?? 0) - (order.coupon_discount ?? 0) - (order.loyalty_points_used ?? 0);
+  const grandTotal = calculateTotal() + (order.delivery_fee ?? 0) + (order.service_fee ?? 0) - (order.coupon_discount ?? 0) - (order.loyalty_points_used ?? 0);
   const needsPayment = (!order.payment_type || order.payment_type === "pending") && !(order.ifood_source && order.payment_type === "Pago pelo iFood");
 
   return (
@@ -465,6 +466,9 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                   )}
                   {order.delivery_type !== "delivery" && (order.delivery_fee ?? 0) > 0 && (
                     <p className="text-sm text-muted-foreground">Taxa de entrega: R$ {order.delivery_fee!.toFixed(2)}</p>
+                  )}
+                  {(order.service_fee ?? 0) > 0 && (
+                    <p className="text-sm text-muted-foreground">Taxa de serviço: R$ {order.service_fee!.toFixed(2)}</p>
                   )}
                   {(order.coupon_discount ?? 0) > 0 && (
                     <p className="text-sm text-green-600">Desconto cupom: -R$ {order.coupon_discount!.toFixed(2)}</p>

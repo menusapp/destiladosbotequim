@@ -31,6 +31,7 @@ export interface OrderForPrinting {
   delivery_address: string | null;
   delivery_phone: string | null;
   delivery_fee: number;
+  service_fee: number;
   coupon_discount: number;
   payment_type: string | null;
   payment_brand: string | null;
@@ -73,6 +74,7 @@ export async function fetchOrderForPrinting(
       delivery_address,
       delivery_phone,
       delivery_fee,
+      service_fee,
       coupon_discount,
       payment_type,
       payment_brand,
@@ -192,6 +194,7 @@ export async function fetchOrderForPrinting(
     delivery_address: (order as any).delivery_address ?? null,
     delivery_phone: (order as any).delivery_phone ?? null,
     delivery_fee: Number((order as any).delivery_fee ?? 0),
+    service_fee: Number((order as any).service_fee ?? 0),
     coupon_discount: Number((order as any).coupon_discount ?? 0),
     payment_type: (order as any).payment_type ?? null,
     payment_brand: (order as any).payment_brand ?? null,
