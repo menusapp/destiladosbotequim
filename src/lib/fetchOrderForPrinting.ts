@@ -77,6 +77,7 @@ export async function fetchOrderForPrinting(
       delivery_fee,
       service_fee,
       coupon_discount,
+      coupon_code,
       payment_type,
       payment_brand,
       notes,
