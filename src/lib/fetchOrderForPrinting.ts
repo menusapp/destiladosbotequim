@@ -33,6 +33,7 @@ export interface OrderForPrinting {
   delivery_fee: number;
   service_fee: number;
   coupon_discount: number;
+  coupon_code: string | null;
   payment_type: string | null;
   payment_brand: string | null;
   notes: string | null;
