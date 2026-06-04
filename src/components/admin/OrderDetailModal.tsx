@@ -59,6 +59,7 @@ interface Order {
   delivery_fee?: number;
   service_fee?: number;
   coupon_discount?: number;
+  coupon_code?: string | null;
   loyalty_points_used?: number;
   ifood_source?: boolean;
   ifood_order_id?: string;
