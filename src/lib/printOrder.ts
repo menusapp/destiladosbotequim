@@ -258,7 +258,7 @@ export const printOrder = async (
           <span>R$ ${subtotal.toFixed(2)}</span>
         </div>
         ${discount > 0 ? `<div class="total-row" style="font-size:12px;">
-          <span>Desconto</span>
+          <span>${order.coupon_code ? `Cupom ${order.coupon_code}` : "Desconto"}</span>
           <span>- R$ ${discount.toFixed(2)}</span>
         </div>` : ""}
         ${discountReason ? `<div style="font-size:10px;font-style:italic;margin-bottom:4px;">Motivo: ${discountReason}</div>` : ""}
