@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import { 
-  Clock, User, Phone, MapPin, Printer, MessageCircle, XCircle, Play, Plus, Minus, Home, Trash2, RefreshCw, Loader2, CalendarClock, ChevronDown
+  Clock, User, Phone, MapPin, Printer, MessageCircle, XCircle, Play, Plus, Minus, Home, Trash2, RefreshCw, Loader2, CalendarClock, ChevronDown, Tag
 } from "lucide-react";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { format } from "date-fns";
