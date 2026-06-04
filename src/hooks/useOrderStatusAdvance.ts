@@ -200,7 +200,7 @@ export function useOrderStatusAdvance(restaurantId: string) {
     } catch (e) { return { ok: false, errorMsg: (e as Error).message }; }
   };
 
-  const syncIfoodStatus = async (order: Order, newStatus: string, reason?: string) => {
+  const syncIfoodStatus = async (order: Order, newStatus: string, reason?: string, cancellationCode?: string) => {
     if (!order.ifood_source || !order.ifood_order_id) return;
     const statusToAction: Record<string, string> = {
       accepted: "confirm", preparing: "start_preparation", ready: "ready_to_pickup",
@@ -208,9 +208,11 @@ export function useOrderStatusAdvance(restaurantId: string) {
     };
     const ifoodAction = statusToAction[newStatus];
     if (!ifoodAction) return;
-    const { error } = await supabase.functions.invoke("ifood-order-action", {
-      body: { restaurant_id: restaurantId, ifood_order_id: order.ifood_order_id, order_id: order.id, action: ifoodAction, reason },
+    console.log("[iFood][action] dispatch", { orderId: order.id, ifoodOrderId: order.ifood_order_id, action: ifoodAction, cancellationCode, reason });
+    const { data, error } = await supabase.functions.invoke("ifood-order-action", {
+      body: { restaurant_id: restaurantId, ifood_order_id: order.ifood_order_id, order_id: order.id, action: ifoodAction, cancellation_code: cancellationCode, reason },
     });
+    console.log("[iFood][action] response", { data, error });
     if (error) {
       console.error("iFood action error:", error);
       toast.error("Erro ao sincronizar com iFood, mas o status local será atualizado");
