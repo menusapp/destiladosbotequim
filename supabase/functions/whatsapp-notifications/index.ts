@@ -191,7 +191,21 @@ Deno.serve(async (req) => {
           lines.push(`Subtotal: ${fmt(subtotal)}`);
           if (deliveryFee > 0) lines.push(`🚚 Taxa de entrega: ${fmt(deliveryFee)}`);
           if (serviceFee > 0) lines.push(`🧾 Taxa de serviço: ${fmt(serviceFee)}`);
-          if (discount > 0) lines.push(`🎟️ Desconto: -${fmt(discount)}`);
+          if (discount > 0) {
+            const couponCode = (order as any)?.coupon_code;
+            lines.push(`🎟️ ${couponCode ? `Cupom ${couponCode}` : 'Desconto'}: -${fmt(discount)}`);
+          }
+        }
+
+        const scheduledFor = (order as any)?.dd_scheduled_for;
+        if (scheduledFor) {
+          try {
+            const d = new Date(scheduledFor);
+            const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' });
+            const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+            lines.push('');
+            lines.push(`⏰ *Agendado para:* ${dateStr} às ${timeStr}`);
+          } catch (_) { /* ignore */ }
         }
 
         if (order?.delivery_address) {
