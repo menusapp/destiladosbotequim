@@ -398,7 +398,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
             )}
             
             {!isFinalized && order.status !== "cancelled" && canManageOrders && (
-              <Button variant="destructive" onClick={() => setShowCancelDialog(true)} className="gap-2"><XCircle className="w-4 h-4" />Cancelar</Button>
+              <Button variant="destructive" onClick={openCancelDialog} className="gap-2"><XCircle className="w-4 h-4" />Cancelar</Button>
             )}
             
             {canAddItems && (
