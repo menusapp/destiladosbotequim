@@ -58,6 +58,7 @@ export const printOrder = async (
     dd_scheduled_for?: string;
     cancellation_reason?: string;
     coupon_discount?: number;
+    coupon_code?: string | null;
     delivery_fee?: number;
     service_fee?: number;
     order_channel?: string;
@@ -162,12 +163,14 @@ export const printOrder = async (
   // Scheduled order section
   let scheduledSection = "";
   if (order.dd_scheduled_for) {
-    const scheduledDate = new Date(order.dd_scheduled_for).toLocaleString("pt-BR", {
-      day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
-    });
+    const d = new Date(order.dd_scheduled_for);
+    const dateStr = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" });
+    const timeStr = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
     scheduledSection = `
       <div class="scheduled-alert">
-        ⏰ AGENDADO PARA: ${scheduledDate}
+        ⏰ PEDIDO AGENDADO<br/>
+        Data: ${dateStr}<br/>
+        Horário: ${timeStr}
       </div>
     `;
   }
@@ -255,7 +258,7 @@ export const printOrder = async (
           <span>R$ ${subtotal.toFixed(2)}</span>
         </div>
         ${discount > 0 ? `<div class="total-row" style="font-size:12px;">
-          <span>Desconto</span>
+          <span>${order.coupon_code ? `Cupom ${order.coupon_code}` : "Desconto"}</span>
           <span>- R$ ${discount.toFixed(2)}</span>
         </div>` : ""}
         ${discountReason ? `<div style="font-size:10px;font-style:italic;margin-bottom:4px;">Motivo: ${discountReason}</div>` : ""}

@@ -231,7 +231,8 @@ function buildCustomerPreview(
   if (showBreakdown) {
     out += lineLR("Subtotal", formatPrice(subtotal), width);
     if (discount > 0) {
-      out += lineLR("Desconto", `- ${formatPrice(discount)}`, width);
+      const discountLabel = order.coupon_code ? `Cupom ${order.coupon_code}` : "Desconto";
+      out += lineLR(discountLabel, `- ${formatPrice(discount)}`, width);
     }
     if (isDelivery) {
       out += lineLR(

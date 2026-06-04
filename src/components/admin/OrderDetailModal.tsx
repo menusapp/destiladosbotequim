@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import { 
-  Clock, User, Phone, MapPin, Printer, MessageCircle, XCircle, Play, Plus, Minus, Home, Trash2, RefreshCw, Loader2, CalendarClock, ChevronDown
+  Clock, User, Phone, MapPin, Printer, MessageCircle, XCircle, Play, Plus, Minus, Home, Trash2, RefreshCw, Loader2, CalendarClock, ChevronDown, Tag
 } from "lucide-react";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { format } from "date-fns";
@@ -59,6 +60,7 @@ interface Order {
   delivery_fee?: number;
   service_fee?: number;
   coupon_discount?: number;
+  coupon_code?: string | null;
   loyalty_points_used?: number;
   ifood_source?: boolean;
   ifood_order_id?: string;
@@ -88,6 +90,9 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [ifoodReasons, setIfoodReasons] = useState<Array<{ cancelCodeId?: string; code?: string; description?: string; cancelCodeDescription?: string }>>([]);
+  const [ifoodReasonCode, setIfoodReasonCode] = useState<string>("");
+  const [loadingReasons, setLoadingReasons] = useState(false);
   const { advanceStatus } = useOrderStatusAdvance(restaurantId);
 
   // Collapsible state
@@ -100,7 +105,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   const refreshOrder = useCallback(async () => {
     const { data, error } = await supabase
       .from("orders")
-      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, payment_brand, delivery_fee, service_fee, coupon_discount, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name)))`)
+      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, payment_brand, delivery_fee, service_fee, coupon_discount, coupon_code, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name)))`)
       .eq("id", order.id)
       .single();
     if (!error && data) {
@@ -148,7 +153,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   const isTakeaway = order.order_type === "delivery" && order.delivery_type === "takeaway";
   const isBalcao = order.order_type === "balcao";
 
-  const updateStatus = async (newStatus: string, reason?: string) => {
+  const updateStatus = async (newStatus: string, reason?: string, cancellationCode?: string) => {
     if (requiresPaymentForFinalization(newStatus) && (!order.payment_type || order.payment_type === "pending")) {
       toast.error("Defina a forma de pagamento antes de finalizar o pedido");
       setShowPaymentModal(true);
@@ -158,7 +163,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
     const previousStatus = order.status;
     setOrder(prev => ({ ...prev, status: newStatus, ...(newStatus === "cancelled" && reason ? { cancellation_reason: reason } : {}) }));
 
-    const success = await advanceStatus(order, newStatus, reason);
+    const success = await advanceStatus(order, newStatus, reason, cancellationCode);
     if (success) {
       onStatusUpdate();
       onClose();
@@ -167,7 +172,44 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
     }
   };
 
+  const openCancelDialog = async () => {
+    setShowCancelDialog(true);
+    setCancelReason("");
+    setIfoodReasonCode("");
+    setIfoodReasons([]);
+    if (order.ifood_source && order.ifood_order_id) {
+      setLoadingReasons(true);
+      try {
+        console.log("[iFood][cancel] fetching reasons", { orderId: order.id, ifoodOrderId: order.ifood_order_id });
+        const { data, error } = await supabase.functions.invoke("ifood-order-action", {
+          body: { restaurant_id: restaurantId, ifood_order_id: order.ifood_order_id, order_id: order.id, action: "get_cancellation_reasons" },
+        });
+        if (error) throw error;
+        const reasons = Array.isArray(data?.reasons) ? data.reasons : [];
+        console.log("[iFood][cancel] reasons received", { count: reasons.length, reasons });
+        setIfoodReasons(reasons);
+      } catch (e: any) {
+        console.error("[iFood][cancel] failed to fetch reasons", e);
+        toast.error("Não foi possível obter os motivos de cancelamento do iFood");
+      } finally {
+        setLoadingReasons(false);
+      }
+    }
+  };
+
   const handleCancelOrder = async () => {
+    const isIfood = !!(order.ifood_source && order.ifood_order_id);
+    if (isIfood) {
+      if (!ifoodReasonCode) { toast.error("Selecione o motivo do cancelamento exigido pelo iFood"); return; }
+      const selected = ifoodReasons.find((r: any) => (r.cancelCodeId || r.code) === ifoodReasonCode);
+      const reasonText = (selected as any)?.description || (selected as any)?.cancelCodeDescription || cancelReason.trim() || "Cancelado pelo restaurante";
+      console.log("[iFood][cancel] submitting", { code: ifoodReasonCode, reasonText });
+      setCancelling(true);
+      await updateStatus("cancelled", reasonText, ifoodReasonCode);
+      setCancelling(false);
+      setShowCancelDialog(false);
+      return;
+    }
     if (!cancelReason.trim()) { toast.error("Informe o motivo do cancelamento"); return; }
     setCancelling(true);
     await updateStatus("cancelled", cancelReason.trim());
@@ -287,12 +329,27 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                 {order.dd_scheduled_for && (
                   <Badge className="bg-amber-500 text-primary-foreground border-0 gap-1">
                     <CalendarClock className="w-3 h-3" />
-                    Agendado {format(new Date(order.dd_scheduled_for), "dd/MM HH:mm")}
+                    Agendado {new Date(order.dd_scheduled_for).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
                   </Badge>
                 )}
               </div>
             </div>
           </DialogHeader>
+
+          {order.dd_scheduled_for && (
+            <div className="rounded-lg border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/30 p-3 flex items-start gap-3">
+              <CalendarClock className="w-5 h-5 text-amber-700 dark:text-amber-300 mt-0.5" />
+              <div>
+                <p className="font-bold text-amber-900 dark:text-amber-100 text-sm uppercase tracking-wide">Pedido Agendado</p>
+                <p className="text-sm text-amber-900 dark:text-amber-100">
+                  <strong>Data:</strong> {new Date(order.dd_scheduled_for).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" })}
+                </p>
+                <p className="text-sm text-amber-900 dark:text-amber-100">
+                  <strong>Horário:</strong> {new Date(order.dd_scheduled_for).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Resumo compacto — sempre visível */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -356,7 +413,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
             )}
             
             {!isFinalized && order.status !== "cancelled" && canManageOrders && (
-              <Button variant="destructive" onClick={() => setShowCancelDialog(true)} className="gap-2"><XCircle className="w-4 h-4" />Cancelar</Button>
+              <Button variant="destructive" onClick={openCancelDialog} className="gap-2"><XCircle className="w-4 h-4" />Cancelar</Button>
             )}
             
             {canAddItems && (
@@ -471,7 +528,10 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                     <p className="text-sm text-muted-foreground">Taxa de serviço: R$ {order.service_fee!.toFixed(2)}</p>
                   )}
                   {(order.coupon_discount ?? 0) > 0 && (
-                    <p className="text-sm text-green-600">Desconto cupom: -R$ {order.coupon_discount!.toFixed(2)}</p>
+                    <p className="text-sm text-green-600 flex items-center justify-end gap-1">
+                      <Tag className="w-3.5 h-3.5" />
+                      {order.coupon_code ? `Cupom ${order.coupon_code}: ` : "Desconto: "}-R$ {order.coupon_discount!.toFixed(2)}
+                    </p>
                   )}
                   {(order.loyalty_points_used ?? 0) > 0 && (
                     <p className="text-sm text-green-600">Pontos fidelidade: -R$ {order.loyalty_points_used!.toFixed(2)}</p>
@@ -544,7 +604,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                     <p className="text-sm text-muted-foreground">Agendado para:</p>
                     <p className="font-medium text-amber-600 flex items-center gap-1">
                       <CalendarClock className="w-4 h-4" />
-                      {format(new Date(order.dd_scheduled_for), "dd/MM/yyyy 'às' HH:mm")}
+                      {new Date(order.dd_scheduled_for).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
                     </p>
                   </div>
                 )}
@@ -599,12 +659,65 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Cancelar Pedido</DialogTitle>
-            <DialogDescription>Informe o motivo do cancelamento. Este campo é obrigatório.</DialogDescription>
+            <DialogDescription>
+              {order.ifood_source
+                ? "O iFood exige um motivo oficial para cancelamento. Selecione abaixo."
+                : "Informe o motivo do cancelamento. Este campo é obrigatório."}
+            </DialogDescription>
           </DialogHeader>
-          <Textarea placeholder="Motivo do cancelamento..." value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} rows={3} />
+
+          {order.ifood_source && order.ifood_order_id ? (
+            <div className="space-y-3">
+              {loadingReasons ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Carregando motivos do iFood...
+                </div>
+              ) : ifoodReasons.length === 0 ? (
+                <p className="text-sm text-destructive">
+                  Nenhum motivo retornado pelo iFood. Verifique a conexão e tente novamente.
+                </p>
+              ) : (
+                <>
+                  <Select value={ifoodReasonCode} onValueChange={setIfoodReasonCode}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o motivo do cancelamento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ifoodReasons.map((r: any) => {
+                        const code = r.cancelCodeId || r.code;
+                        const desc = r.description || r.cancelCodeDescription || code;
+                        return (
+                          <SelectItem key={code} value={code}>
+                            {code} — {desc}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <Textarea
+                    placeholder="Observação adicional (opcional)"
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    rows={2}
+                  />
+                </>
+              )}
+            </div>
+          ) : (
+            <Textarea placeholder="Motivo do cancelamento..." value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} rows={3} />
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCancelDialog(false); setCancelReason(""); }}>Voltar</Button>
-            <Button variant="destructive" onClick={handleCancelOrder} disabled={cancelling || !cancelReason.trim()}>
+            <Button variant="outline" onClick={() => { setShowCancelDialog(false); setCancelReason(""); setIfoodReasonCode(""); }}>Voltar</Button>
+            <Button
+              variant="destructive"
+              onClick={handleCancelOrder}
+              disabled={
+                cancelling ||
+                loadingReasons ||
+                (order.ifood_source ? !ifoodReasonCode : !cancelReason.trim())
+              }
+            >
               {cancelling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <XCircle className="w-4 h-4 mr-2" />}
               Confirmar Cancelamento
             </Button>
