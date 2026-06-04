@@ -153,7 +153,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   const isTakeaway = order.order_type === "delivery" && order.delivery_type === "takeaway";
   const isBalcao = order.order_type === "balcao";
 
-  const updateStatus = async (newStatus: string, reason?: string) => {
+  const updateStatus = async (newStatus: string, reason?: string, cancellationCode?: string) => {
     if (requiresPaymentForFinalization(newStatus) && (!order.payment_type || order.payment_type === "pending")) {
       toast.error("Defina a forma de pagamento antes de finalizar o pedido");
       setShowPaymentModal(true);
@@ -163,7 +163,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
     const previousStatus = order.status;
     setOrder(prev => ({ ...prev, status: newStatus, ...(newStatus === "cancelled" && reason ? { cancellation_reason: reason } : {}) }));
 
-    const success = await advanceStatus(order, newStatus, reason);
+    const success = await advanceStatus(order, newStatus, reason, cancellationCode);
     if (success) {
       onStatusUpdate();
       onClose();
@@ -172,7 +172,44 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
     }
   };
 
+  const openCancelDialog = async () => {
+    setShowCancelDialog(true);
+    setCancelReason("");
+    setIfoodReasonCode("");
+    setIfoodReasons([]);
+    if (order.ifood_source && order.ifood_order_id) {
+      setLoadingReasons(true);
+      try {
+        console.log("[iFood][cancel] fetching reasons", { orderId: order.id, ifoodOrderId: order.ifood_order_id });
+        const { data, error } = await supabase.functions.invoke("ifood-order-action", {
+          body: { restaurant_id: restaurantId, ifood_order_id: order.ifood_order_id, order_id: order.id, action: "get_cancellation_reasons" },
+        });
+        if (error) throw error;
+        const reasons = Array.isArray(data?.reasons) ? data.reasons : [];
+        console.log("[iFood][cancel] reasons received", { count: reasons.length, reasons });
+        setIfoodReasons(reasons);
+      } catch (e: any) {
+        console.error("[iFood][cancel] failed to fetch reasons", e);
+        toast.error("Não foi possível obter os motivos de cancelamento do iFood");
+      } finally {
+        setLoadingReasons(false);
+      }
+    }
+  };
+
   const handleCancelOrder = async () => {
+    const isIfood = !!(order.ifood_source && order.ifood_order_id);
+    if (isIfood) {
+      if (!ifoodReasonCode) { toast.error("Selecione o motivo do cancelamento exigido pelo iFood"); return; }
+      const selected = ifoodReasons.find((r: any) => (r.cancelCodeId || r.code) === ifoodReasonCode);
+      const reasonText = (selected as any)?.description || (selected as any)?.cancelCodeDescription || cancelReason.trim() || "Cancelado pelo restaurante";
+      console.log("[iFood][cancel] submitting", { code: ifoodReasonCode, reasonText });
+      setCancelling(true);
+      await updateStatus("cancelled", reasonText, ifoodReasonCode);
+      setCancelling(false);
+      setShowCancelDialog(false);
+      return;
+    }
     if (!cancelReason.trim()) { toast.error("Informe o motivo do cancelamento"); return; }
     setCancelling(true);
     await updateStatus("cancelled", cancelReason.trim());
