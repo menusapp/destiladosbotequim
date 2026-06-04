@@ -329,12 +329,27 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                 {order.dd_scheduled_for && (
                   <Badge className="bg-amber-500 text-primary-foreground border-0 gap-1">
                     <CalendarClock className="w-3 h-3" />
-                    Agendado {format(new Date(order.dd_scheduled_for), "dd/MM HH:mm")}
+                    Agendado {new Date(order.dd_scheduled_for).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
                   </Badge>
                 )}
               </div>
             </div>
           </DialogHeader>
+
+          {order.dd_scheduled_for && (
+            <div className="rounded-lg border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/30 p-3 flex items-start gap-3">
+              <CalendarClock className="w-5 h-5 text-amber-700 dark:text-amber-300 mt-0.5" />
+              <div>
+                <p className="font-bold text-amber-900 dark:text-amber-100 text-sm uppercase tracking-wide">Pedido Agendado</p>
+                <p className="text-sm text-amber-900 dark:text-amber-100">
+                  <strong>Data:</strong> {new Date(order.dd_scheduled_for).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" })}
+                </p>
+                <p className="text-sm text-amber-900 dark:text-amber-100">
+                  <strong>Horário:</strong> {new Date(order.dd_scheduled_for).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Resumo compacto — sempre visível */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
