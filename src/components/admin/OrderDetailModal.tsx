@@ -659,12 +659,65 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Cancelar Pedido</DialogTitle>
-            <DialogDescription>Informe o motivo do cancelamento. Este campo é obrigatório.</DialogDescription>
+            <DialogDescription>
+              {order.ifood_source
+                ? "O iFood exige um motivo oficial para cancelamento. Selecione abaixo."
+                : "Informe o motivo do cancelamento. Este campo é obrigatório."}
+            </DialogDescription>
           </DialogHeader>
-          <Textarea placeholder="Motivo do cancelamento..." value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} rows={3} />
+
+          {order.ifood_source && order.ifood_order_id ? (
+            <div className="space-y-3">
+              {loadingReasons ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Carregando motivos do iFood...
+                </div>
+              ) : ifoodReasons.length === 0 ? (
+                <p className="text-sm text-destructive">
+                  Nenhum motivo retornado pelo iFood. Verifique a conexão e tente novamente.
+                </p>
+              ) : (
+                <>
+                  <Select value={ifoodReasonCode} onValueChange={setIfoodReasonCode}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o motivo do cancelamento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ifoodReasons.map((r: any) => {
+                        const code = r.cancelCodeId || r.code;
+                        const desc = r.description || r.cancelCodeDescription || code;
+                        return (
+                          <SelectItem key={code} value={code}>
+                            {code} — {desc}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <Textarea
+                    placeholder="Observação adicional (opcional)"
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    rows={2}
+                  />
+                </>
+              )}
+            </div>
+          ) : (
+            <Textarea placeholder="Motivo do cancelamento..." value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} rows={3} />
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCancelDialog(false); setCancelReason(""); }}>Voltar</Button>
-            <Button variant="destructive" onClick={handleCancelOrder} disabled={cancelling || !cancelReason.trim()}>
+            <Button variant="outline" onClick={() => { setShowCancelDialog(false); setCancelReason(""); setIfoodReasonCode(""); }}>Voltar</Button>
+            <Button
+              variant="destructive"
+              onClick={handleCancelOrder}
+              disabled={
+                cancelling ||
+                loadingReasons ||
+                (order.ifood_source ? !ifoodReasonCode : !cancelReason.trim())
+              }
+            >
               {cancelling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <XCircle className="w-4 h-4 mr-2" />}
               Confirmar Cancelamento
             </Button>
