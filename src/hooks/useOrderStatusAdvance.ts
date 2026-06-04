@@ -227,7 +227,7 @@ export function useOrderStatusAdvance(restaurantId: string) {
     return ["delivered", "picked_up"].includes(newStatus);
   };
 
-  const advanceStatus = async (order: Order, newStatus: string, reason?: string): Promise<boolean> => {
+  const advanceStatus = async (order: Order, newStatus: string, reason?: string, cancellationCode?: string): Promise<boolean> => {
     if (requiresPaymentForFinalization(order, newStatus) && (!order.payment_type || order.payment_type === "pending")) {
       toast.error("Defina a forma de pagamento antes de finalizar o pedido");
       return false;
@@ -235,7 +235,7 @@ export function useOrderStatusAdvance(restaurantId: string) {
 
     setLoadingOrderId(order.id);
     try {
-      await syncIfoodStatus(order, newStatus, reason);
+      await syncIfoodStatus(order, newStatus, reason, cancellationCode);
 
       const ddResult = await syncDDStatus(order, newStatus, reason);
       if (!ddResult.ok) {
