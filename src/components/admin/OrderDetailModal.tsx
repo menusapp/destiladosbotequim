@@ -604,7 +604,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                     <p className="text-sm text-muted-foreground">Agendado para:</p>
                     <p className="font-medium text-amber-600 flex items-center gap-1">
                       <CalendarClock className="w-4 h-4" />
-                      {format(new Date(order.dd_scheduled_for), "dd/MM/yyyy 'às' HH:mm")}
+                      {new Date(order.dd_scheduled_for).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })}
                     </p>
                   </div>
                 )}
