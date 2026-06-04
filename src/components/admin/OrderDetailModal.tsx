@@ -90,6 +90,9 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelling, setCancelling] = useState(false);
+  const [ifoodReasons, setIfoodReasons] = useState<Array<{ cancelCodeId?: string; code?: string; description?: string; cancelCodeDescription?: string }>>([]);
+  const [ifoodReasonCode, setIfoodReasonCode] = useState<string>("");
+  const [loadingReasons, setLoadingReasons] = useState(false);
   const { advanceStatus } = useOrderStatusAdvance(restaurantId);
 
   // Collapsible state
