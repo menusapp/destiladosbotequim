@@ -198,6 +198,7 @@ export async function fetchOrderForPrinting(
     delivery_fee: Number((order as any).delivery_fee ?? 0),
     service_fee: Number((order as any).service_fee ?? 0),
     coupon_discount: Number((order as any).coupon_discount ?? 0),
+    coupon_code: (order as any).coupon_code ?? null,
     payment_type: (order as any).payment_type ?? null,
     payment_brand: (order as any).payment_brand ?? null,
     notes: (order as any).notes ?? null,
