@@ -528,10 +528,18 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
                     <p className="text-sm text-muted-foreground">Taxa de serviço: R$ {order.service_fee!.toFixed(2)}</p>
                   )}
                   {(order.coupon_discount ?? 0) > 0 && (
-                    <p className="text-sm text-green-600 flex items-center justify-end gap-1">
-                      <Tag className="w-3.5 h-3.5" />
-                      {order.coupon_code ? `Cupom ${order.coupon_code}: ` : "Desconto: "}-R$ {order.coupon_discount!.toFixed(2)}
-                    </p>
+                    <>
+                      <p className="text-sm text-green-600 flex items-center justify-end gap-1">
+                        <Tag className="w-3.5 h-3.5" />
+                        {order.coupon_code ? `Cupom ${order.coupon_code}: ` : "Desconto: "}-R$ {order.coupon_discount!.toFixed(2)}
+                      </p>
+                      {(() => {
+                        const sponsor = parseCouponSponsor(order.notes);
+                        return sponsor ? (
+                          <p className="text-[11px] text-muted-foreground">Subsidiado por: {sponsor}</p>
+                        ) : null;
+                      })()}
+                    </>
                   )}
                   {(order.loyalty_points_used ?? 0) > 0 && (
                     <p className="text-sm text-green-600">Pontos fidelidade: -R$ {order.loyalty_points_used!.toFixed(2)}</p>
