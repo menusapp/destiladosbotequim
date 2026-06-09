@@ -261,6 +261,10 @@ export const printOrder = async (
           <span>${order.coupon_code ? `Cupom ${order.coupon_code}` : "Desconto"}</span>
           <span>- R$ ${discount.toFixed(2)}</span>
         </div>` : ""}
+        ${(() => {
+          const m = order.notes?.match(/Subsidiado\s*por:\s*([^|]+?)(?:\s*\||\s*$)/i);
+          return discount > 0 && m ? `<div style="font-size:10px;font-style:italic;margin-bottom:4px;">Subsidiado por: ${m[1].trim()}</div>` : "";
+        })()}
         ${discountReason ? `<div style="font-size:10px;font-style:italic;margin-bottom:4px;">Motivo: ${discountReason}</div>` : ""}
         ${isDelivery ? `<div class="total-row" style="font-size:12px;">
           <span>Taxa de entrega</span>
