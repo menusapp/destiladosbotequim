@@ -448,6 +448,7 @@ Deno.serve(async (req) => {
           // Formato padrão reconhecido por parseChangeFor() no frontend ("Troco para: R$ X,YY")
           if (changeFor != null && changeFor > 0) noteParts.push(`Troco para: R$ ${changeFor.toFixed(2)}`);
           if (couponDiscount > 0) noteParts.push(`Voucher${couponCode ? ` (${couponCode})` : ""}: -R$ ${couponDiscount.toFixed(2)}`);
+          if (sponsorLabel) noteParts.push(`Subsidiado por: ${sponsorLabel}`);
           if (customerObservation) noteParts.push(`Obs.: ${customerObservation}`);
           const orderNotes = noteParts.join(" | ");
 
