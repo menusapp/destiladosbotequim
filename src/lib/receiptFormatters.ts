@@ -189,3 +189,13 @@ export function cleanReceiptNotes(notes: string | null | undefined): string {
   s = s.split("|").map((p) => p.trim()).filter(Boolean).join(" | ");
   return s.replace(/\s{2,}/g, " ").trim();
 }
+
+/**
+ * Extrai a etiqueta de subsídio do desconto/cupom (iFood):
+ * "Subsidiado por: iFood" | "Restaurante" | "iFood + Restaurante".
+ */
+export function parseCouponSponsor(notes: string | null | undefined): string | null {
+  if (!notes) return null;
+  const m = notes.match(/Subsidiado\s*por:\s*([^|]+?)(?:\s*\||\s*$)/i);
+  return m ? m[1].trim() : null;
+}
