@@ -233,6 +233,10 @@ function buildCustomerPreview(
     if (discount > 0) {
       const discountLabel = order.coupon_code ? `Cupom ${order.coupon_code}` : "Desconto";
       out += lineLR(discountLabel, `- ${formatPrice(discount)}`, width);
+      const sponsorMatch = order.notes?.match(/Subsidiado\s*por:\s*([^|]+?)(?:\s*\||\s*$)/i);
+      if (sponsorMatch) {
+        out += `  Subsidiado por: ${sponsorMatch[1].trim()}\n`;
+      }
     }
     if (isDelivery) {
       out += lineLR(

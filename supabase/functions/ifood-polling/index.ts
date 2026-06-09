@@ -340,9 +340,11 @@ Deno.serve(async (req) => {
               : "TRATADO COMO IMEDIATO (orderTiming != SCHEDULED)",
           }));
 
-          // ── Voucher / coupon discount ──────────────────────────────────
+          // ── Voucher / coupon discount + sponsor breakdown ──────────────
           let couponCode: string | null = null;
           let couponDiscount = 0;
+          let sponsorIfood = 0;
+          let sponsorMerchant = 0;
           const benefits = Array.isArray(orderData.benefits) ? orderData.benefits : [];
           for (const b of benefits) {
             const benefitValue = Number(b?.value || b?.benefitValue || 0);
@@ -352,12 +354,22 @@ Deno.serve(async (req) => {
             const sponsorships = Array.isArray(b?.sponsorshipValues) ? b.sponsorshipValues : [];
             for (const sp of sponsorships) {
               if (sp?.name && !couponCode) couponCode = String(sp.name);
+              const spName = String(sp?.name || "").toUpperCase();
+              const spValue = Number(sp?.value || 0) || 0;
+              if (spName.includes("IFOOD")) sponsorIfood += spValue;
+              else if (spName.includes("MERCHANT") || spName.includes("RESTAURANT")) sponsorMerchant += spValue;
             }
             if (!couponCode && b?.target) couponCode = String(b.target);
           }
           if (couponDiscount === 0 && orderData.total?.benefits) {
             couponDiscount = Number(orderData.total.benefits) || 0;
           }
+          // Resolve sponsor label for display
+          let sponsorLabel: string | null = null;
+          if (sponsorIfood > 0 && sponsorMerchant > 0) sponsorLabel = "iFood + Restaurante";
+          else if (sponsorIfood > 0) sponsorLabel = "iFood";
+          else if (sponsorMerchant > 0) sponsorLabel = "Restaurante";
+          console.log("[ifood-polling][audit][coupon]", { orderId, couponCode, couponDiscount, sponsorIfood, sponsorMerchant, sponsorLabel });
 
           // ── Payment type + change (cash) ───────────────────────────────
           let paymentType = "Pago pelo iFood";
@@ -436,6 +448,7 @@ Deno.serve(async (req) => {
           // Formato padrão reconhecido por parseChangeFor() no frontend ("Troco para: R$ X,YY")
           if (changeFor != null && changeFor > 0) noteParts.push(`Troco para: R$ ${changeFor.toFixed(2)}`);
           if (couponDiscount > 0) noteParts.push(`Voucher${couponCode ? ` (${couponCode})` : ""}: -R$ ${couponDiscount.toFixed(2)}`);
+          if (sponsorLabel) noteParts.push(`Subsidiado por: ${sponsorLabel}`);
           if (customerObservation) noteParts.push(`Obs.: ${customerObservation}`);
           const orderNotes = noteParts.join(" | ");
 
