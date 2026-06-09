@@ -181,6 +181,7 @@ export function cleanReceiptNotes(notes: string | null | undefined): string {
   s = s.replace(/Taxa de entrega:[^|]*/gi, "");
   s = s.replace(/Taxa de servi[cç]o[^|]*/gi, "");
   s = s.replace(/Troco\s*para[:\s]+R?\$?\s*[\d.,]+/gi, "");
+  s = s.replace(/Subsidiado por:[^|]*/gi, "");
   s = s.replace(/Voucher[^|]*/gi, "");
   s = s.replace(/\[Desconto:.+?\]/g, "");
   s = s.replace(/Obs\.?:\s*/i, "");
