@@ -37,6 +37,89 @@ function toReadableUrlProxy(url: string) {
   return `https://r.jina.ai/http://${url}`;
 }
 
+function cleanMarkdownText(value: string) {
+  return value
+    .replace(/^#+\s*/, "")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[[^\]]*\]\([^)]*\)/g, "")
+    .trim();
+}
+
+function parsePrice(value: string) {
+  const match = value.match(/R\$\s*([\d.]+,\d{2})/i);
+  if (!match) return undefined;
+  return Number(match[1].replace(/\./g, "").replace(",", "."));
+}
+
+function parseAnotaAiMarkdown(markdown: string) {
+  const categories: Array<{ name: string; products: Array<{ name: string; description?: string; price: number; image_url?: string }> }> = [];
+  let currentCategory: (typeof categories)[number] | null = null;
+  let currentProduct: (typeof categories)[number]["products"][number] | null = null;
+  const descriptionLines: string[] = [];
+
+  const flushDescription = () => {
+    if (currentProduct && descriptionLines.length) {
+      currentProduct.description = descriptionLines.join(" ").trim();
+      descriptionLines.length = 0;
+    }
+  };
+
+  const ensureCategory = (name = "Produtos") => {
+    currentCategory = categories.find((category) => category.name === name) || null;
+    if (!currentCategory) {
+      currentCategory = { name, products: [] };
+      categories.push(currentCategory);
+    }
+    return currentCategory;
+  };
+
+  const content = markdown.includes("Markdown Content:")
+    ? markdown.split("Markdown Content:").slice(1).join("Markdown Content:")
+    : markdown;
+
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line === "%" || /cashback/i.test(line) || /^Aberto\b/i.test(line)) continue;
+
+    const imageMatch = line.match(/!\[[^\]]*\]\((https?:\/\/[^)]+)\)/i);
+    if (imageMatch && currentProduct && !currentProduct.image_url && !imageMatch[1].includes("item_no_image")) {
+      currentProduct.image_url = imageMatch[1];
+      continue;
+    }
+
+    if (line.startsWith("## ")) {
+      flushDescription();
+      const categoryName = cleanMarkdownText(line) || "Produtos";
+      ensureCategory(categoryName);
+      currentProduct = null;
+      continue;
+    }
+
+    if (line.startsWith("### ")) {
+      flushDescription();
+      const name = cleanMarkdownText(line);
+      if (!name) continue;
+      const category = ensureCategory();
+      currentProduct = { name, price: 0, image_url: "" };
+      category.products.push(currentProduct);
+      continue;
+    }
+
+    const price = parsePrice(line);
+    if (typeof price === "number" && currentProduct) {
+      currentProduct.price = price;
+      continue;
+    }
+
+    if (currentProduct && !line.startsWith("!")) {
+      descriptionLines.push(cleanMarkdownText(line));
+    }
+  }
+
+  flushDescription();
+  return { categories: categories.filter((category) => category.products.length > 0) };
+}
+
 /** Extract image URLs from HTML, resolving relative paths */
 function extractImageUrls(html: string, baseUrl: string): Map<string, string[]> {
   const imageMap = new Map<string, string[]>();
