@@ -533,6 +533,8 @@ Deno.serve(async (req) => {
               service_fee: serviceFeeNum,
               payment_type: paymentType,
               ifood_order_id: orderId,
+              ifood_display_id: orderData.displayId ? String(orderData.displayId) : null,
+              ifood_merchant_id: merchantId || null,
               ifood_source: true,
               notes: orderNotes,
               coupon_code: couponCode,

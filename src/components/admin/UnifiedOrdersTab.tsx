@@ -64,6 +64,8 @@ interface Order {
   loyalty_points_used?: number;
   ifood_source?: boolean;
   ifood_order_id?: string;
+  ifood_display_id?: string | null;
+  ifood_merchant_id?: string | null;
   dd_source?: boolean;
   dd_order_id?: string;
   dd_scheduled_for?: string;
@@ -292,7 +294,7 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select(`id, daily_order_number, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, payment_brand, delivery_fee, service_fee, coupon_discount, coupon_code, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name)))`)
+      .select(`id, daily_order_number, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, payment_brand, delivery_fee, service_fee, coupon_discount, coupon_code, loyalty_points_used, ifood_source, ifood_order_id, ifood_display_id, ifood_merchant_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name)))`)
       .eq("restaurant_id", restaurantId)
       .in("order_type", ["delivery", "balcao"])
       .gte("created_at", dateRange.from.toISOString())

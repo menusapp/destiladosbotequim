@@ -55,6 +55,8 @@ export interface OrderCardOrder {
   coupon_discount?: number;
   loyalty_points_used?: number;
   ifood_source?: boolean;
+  ifood_display_id?: string | null;
+  ifood_order_id?: string | null;
   dd_source?: boolean;
   dd_scheduled_for?: string;
 }
@@ -133,7 +135,14 @@ const OrderCardBase = ({
     >
       <CardContent className="p-3 space-y-1.5 flex flex-col h-full">
         <div className="flex items-center justify-between">
-          <span className="font-bold text-xs text-muted-foreground">{order.daily_order_number != null ? `Pedido ${order.daily_order_number}` : `#${order.id.slice(0, 8)}`}</span>
+          <div className="flex flex-col leading-tight">
+            <span className="font-bold text-xs text-muted-foreground">{order.daily_order_number != null ? `Pedido ${order.daily_order_number}` : `#${order.id.slice(0, 8)}`}</span>
+            {order.ifood_source && (order.ifood_display_id || order.ifood_order_id) && (
+              <span className="text-[10px] font-semibold text-[#EA1D2C]">
+                iFood: {order.ifood_display_id || order.ifood_order_id?.slice(0, 8)}
+              </span>
+            )}
+          </div>
           {showPrepTimer && !isClosed && !isScheduled && (
             <Badge className={`text-[10px] px-1.5 py-0 ${elapsedClass}`}>{elapsed}min</Badge>
           )}

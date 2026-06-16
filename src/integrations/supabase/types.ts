@@ -2576,6 +2576,8 @@ export type Database = {
           delivery_phone: string | null
           delivery_type: string | null
           id: string
+          ifood_display_id: string | null
+          ifood_merchant_id: string | null
           ifood_order_id: string | null
           ifood_source: boolean | null
           loyalty_points_earned: number | null
@@ -2616,6 +2618,8 @@ export type Database = {
           delivery_phone?: string | null
           delivery_type?: string | null
           id?: string
+          ifood_display_id?: string | null
+          ifood_merchant_id?: string | null
           ifood_order_id?: string | null
           ifood_source?: boolean | null
           loyalty_points_earned?: number | null
@@ -2656,6 +2660,8 @@ export type Database = {
           delivery_phone?: string | null
           delivery_type?: string | null
           id?: string
+          ifood_display_id?: string | null
+          ifood_merchant_id?: string | null
           ifood_order_id?: string | null
           ifood_source?: boolean | null
           loyalty_points_earned?: number | null

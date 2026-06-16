@@ -64,6 +64,8 @@ interface Order {
   loyalty_points_used?: number;
   ifood_source?: boolean;
   ifood_order_id?: string;
+  ifood_display_id?: string | null;
+  ifood_merchant_id?: string | null;
   dd_source?: boolean;
   dd_order_id?: string;
   dd_scheduled_for?: string;
@@ -105,7 +107,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
   const refreshOrder = useCallback(async () => {
     const { data, error } = await supabase
       .from("orders")
-      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, payment_brand, delivery_fee, service_fee, coupon_discount, coupon_code, loyalty_points_used, ifood_source, ifood_order_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name)))`)
+      .select(`id, status, created_at, customer_name, customer_cpf, delivery_type, order_type, delivery_address, delivery_phone, notes, payment_type, payment_brand, delivery_fee, service_fee, coupon_discount, coupon_code, loyalty_points_used, ifood_source, ifood_order_id, ifood_display_id, ifood_merchant_id, dd_source, dd_order_id, dd_scheduled_for, cancellation_reason, table_id, tables(table_number), order_items(id, quantity, price_at_order, notes, products(name), order_item_extras(price_at_order, extra_name, product_extras(name)))`)
       .eq("id", order.id)
       .single();
     if (!error && data) {
@@ -320,6 +322,11 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
             <div className="flex items-start justify-between">
               <div>
                 <DialogTitle className="text-2xl">{order.daily_order_number != null ? `Pedido ${order.daily_order_number}` : `Pedido #${order.id.slice(0, 8)}`}</DialogTitle>
+                {order.ifood_source && (order.ifood_display_id || order.ifood_order_id) && (
+                  <p className="text-sm font-semibold text-[#EA1D2C] mt-0.5">
+                    iFood: {order.ifood_display_id || order.ifood_order_id?.slice(0, 8)}
+                  </p>
+                )}
                 <p className="text-sm text-muted-foreground mt-1">{format(new Date(order.created_at), "dd/MM/yyyy 'às' HH:mm")}</p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -360,6 +367,24 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
             )}
             {needsPayment && <Badge variant="destructive" className="text-xs">Falta pagamento</Badge>}
           </div>
+
+          {order.ifood_source && (
+            <div className="rounded-lg border border-[#EA1D2C]/40 bg-[#EA1D2C]/5 p-3 space-y-1">
+              <p className="font-semibold text-sm text-[#EA1D2C]">Dados da Integração</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <p><span className="text-muted-foreground">Origem:</span> <strong>iFood</strong></p>
+                {order.ifood_display_id && (
+                  <p><span className="text-muted-foreground">Display ID iFood:</span> <strong className="font-mono">{order.ifood_display_id}</strong></p>
+                )}
+                {order.ifood_order_id && (
+                  <p className="sm:col-span-2 break-all"><span className="text-muted-foreground">Order ID iFood:</span> <strong className="font-mono">{order.ifood_order_id}</strong></p>
+                )}
+                {order.ifood_merchant_id && (
+                  <p className="sm:col-span-2 break-all"><span className="text-muted-foreground">Merchant ID:</span> <strong className="font-mono">{order.ifood_merchant_id}</strong></p>
+                )}
+              </div>
+            </div>
+          )}
 
           <Separator />
 
