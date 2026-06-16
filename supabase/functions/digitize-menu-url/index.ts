@@ -196,28 +196,19 @@ serve(async (req) => {
     const { url, cuisine_type, custom_cuisine, mode } = await req.json();
 
     if (!url || typeof url !== "string") {
-      return new Response(
-        JSON.stringify({ error: "URL é obrigatória" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "URL é obrigatória" });
     }
 
     // Validate URL
     try {
       new URL(url);
     } catch {
-      return new Response(
-        JSON.stringify({ error: "URL inválida" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "URL inválida" });
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "LOVABLE_API_KEY não configurada" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "LOVABLE_API_KEY não configurada" });
     }
 
     // Step 1: Fetch the webpage content
