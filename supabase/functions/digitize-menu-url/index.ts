@@ -233,20 +233,29 @@ serve(async (req) => {
         redirect: "follow",
       });
 
-      if (!pageResp.ok) {
-        return new Response(
-          JSON.stringify({ error: `Não foi possível acessar o site (HTTP ${pageResp.status})` }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      if (pageResp.ok) {
+        pageContent = await pageResp.text();
+      } else if (pageResp.status === 401 || pageResp.status === 403 || pageResp.status === 429) {
+        console.log(`Direct fetch blocked with HTTP ${pageResp.status}, trying readable proxy`);
+        const proxyResp = await fetch(toReadableUrlProxy(url), {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/plain,text/markdown,text/html,*/*;q=0.8",
+            "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+          },
+          redirect: "follow",
+        });
 
-      pageContent = await pageResp.text();
+        if (!proxyResp.ok) {
+          return jsonResponse({ error: `Não foi possível acessar o site (HTTP ${pageResp.status})` });
+        }
+        pageContent = await proxyResp.text();
+      } else {
+        return jsonResponse({ error: `Não foi possível acessar o site (HTTP ${pageResp.status})` });
+      }
     } catch (fetchErr) {
       console.error("Fetch error:", fetchErr);
-      return new Response(
-        JSON.stringify({ error: "Não foi possível acessar o site. Verifique se o link está correto." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Não foi possível acessar o site. Verifique se o link está correto." });
     }
 
     // Extract image URLs from raw HTML before stripping tags
@@ -313,10 +322,7 @@ serve(async (req) => {
     }
 
     if (truncatedContent.length < 50) {
-      return new Response(
-        JSON.stringify({ error: "Não foi possível extrair conteúdo do site. O site pode usar JavaScript para renderizar (SPA) ou estar protegido." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Não foi possível extrair conteúdo do site. O site pode usar JavaScript para renderizar (SPA) ou estar protegido." });
     }
 
     console.log("Content length:", truncatedContent.length, "Image context length:", imageContext.length);
