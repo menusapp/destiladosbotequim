@@ -252,6 +252,15 @@ Deno.serve(async (req) => {
       const eventCode = event.fullCode || event.code || "";
       const orderId = event.orderId;
       console.log("Evento recebido:", JSON.stringify({ id: event.id, code: event.code, fullCode: event.fullCode, orderId: event.orderId }));
+      auditLog({
+        merchantId,
+        tokenMerchantId,
+        orderId,
+        action: `event_${eventCode || "unknown"}`,
+        endpoint: pollingEndpoint,
+        status: eventsRes.status,
+        response: { event_id: event.id, event_merchant_id: event.merchantId ?? null, created_at: event.createdAt ?? null },
+      });
 
       if (eventCode === "PLACED") {
         // Check if order already exists
@@ -265,16 +274,17 @@ Deno.serve(async (req) => {
 
         // Get order details
         try {
-          const orderRes = await fetch(`${IFOOD_API}/order/v1.0/orders/${orderId}`, {
+          const orderEndpoint = `/order/v1.0/orders/${orderId}`;
+          const orderRes = await fetch(`${IFOOD_API}${orderEndpoint}`, {
             headers: { Authorization: `Bearer ${accessToken}` },
           });
+          const orderText = await orderRes.text();
+          auditLog({ merchantId, tokenMerchantId, orderId, action: "get_order_details", endpoint: orderEndpoint, status: orderRes.status, response: orderText || null });
 
           if (!orderRes.ok) {
-            await orderRes.text();
             continue;
           }
 
-          const orderText = await orderRes.text();
           if (!orderText) continue;
           const orderData = JSON.parse(orderText);
 
