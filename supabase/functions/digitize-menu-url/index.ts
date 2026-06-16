@@ -33,8 +33,13 @@ function jsonResponse(payload: unknown, status = 200) {
   });
 }
 
-function toReadableUrlProxy(url: string) {
-  return `https://r.jina.ai/http://${url}`;
+function toReadableUrlProxies(url: string) {
+  const plainUrl = url.replace(/^https?:\/\//i, "");
+  return [
+    `https://r.jina.ai/http://${url}`,
+    `https://r.jina.ai/http://r.jina.ai/http://${url}`,
+    `https://r.jina.ai/http://${plainUrl}`,
+  ];
 }
 
 function cleanMarkdownText(value: string) {
