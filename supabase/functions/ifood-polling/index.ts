@@ -127,7 +127,15 @@ Deno.serve(async (req) => {
           }),
         });
         const refreshText = await refreshRes.text();
-        auditLog({ merchantId, tokenMerchantId, orderId: null, action: "refresh_token", endpoint: refreshEndpoint, status: refreshRes.status, response: refreshText || null });
+        auditLog({
+          merchantId,
+          tokenMerchantId,
+          orderId: null,
+          action: "refresh_token",
+          endpoint: refreshEndpoint,
+          status: refreshRes.status,
+          response: refreshRes.ok ? { success: true, token_response_redacted: true } : refreshText || null,
+        });
         if (!refreshRes.ok) {
           console.error("[ifood-polling] Refresh failed:", refreshText);
           return new Response(
