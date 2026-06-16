@@ -332,6 +332,14 @@ serve(async (req) => {
       return jsonResponse({ error: "Não foi possível acessar o site. Verifique se o link está correto." });
     }
 
+    if (!isComplements && /pedido\.anota\.ai\/loja\//i.test(url)) {
+      const anotaMenu = parseAnotaAiMarkdown(pageContent);
+      if (anotaMenu.categories.length > 0) {
+        console.log(`Parsed Anota.ai menu directly: ${anotaMenu.categories.length} categories`);
+        return jsonResponse(anotaMenu);
+      }
+    }
+
     // Extract image URLs from raw HTML before stripping tags
     const isComplements = mode === "complements";
     const imageUrls = !isComplements ? extractImageUrls(pageContent, url) : new Map();
