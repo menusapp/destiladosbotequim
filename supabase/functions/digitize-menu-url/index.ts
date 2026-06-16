@@ -26,6 +26,105 @@ const complementCuisinePrompts: Record<string, string> = {
   outros: "Foque em itens COMPLEMENTARES: ingredientes extras, molhos, acompanhamentos adicionais.",
 };
 
+function jsonResponse(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function toReadableUrlProxies(url: string) {
+  const plainUrl = url.replace(/^https?:\/\//i, "");
+  return [
+    `https://r.jina.ai/http://${url}`,
+    `https://r.jina.ai/http://r.jina.ai/http://${url}`,
+    `https://r.jina.ai/http://${plainUrl}`,
+  ];
+}
+
+function cleanMarkdownText(value: string) {
+  return value
+    .replace(/^#+\s*/, "")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+    .replace(/\[[^\]]*\]\([^)]*\)/g, "")
+    .trim();
+}
+
+function parsePrice(value: string) {
+  const match = value.match(/R\$\s*([\d.]+,\d{2})/i);
+  if (!match) return undefined;
+  return Number(match[1].replace(/\./g, "").replace(",", "."));
+}
+
+function parseAnotaAiMarkdown(markdown: string) {
+  const categories: Array<{ name: string; products: Array<{ name: string; description?: string; price: number; image_url?: string }> }> = [];
+  let currentCategory: (typeof categories)[number] | null = null;
+  let currentProduct: (typeof categories)[number]["products"][number] | null = null;
+  const descriptionLines: string[] = [];
+
+  const flushDescription = () => {
+    if (currentProduct && descriptionLines.length) {
+      currentProduct.description = descriptionLines.join(" ").trim();
+      descriptionLines.length = 0;
+    }
+  };
+
+  const ensureCategory = (name = "Produtos") => {
+    currentCategory = categories.find((category) => category.name === name) || null;
+    if (!currentCategory) {
+      currentCategory = { name, products: [] };
+      categories.push(currentCategory);
+    }
+    return currentCategory;
+  };
+
+  const content = markdown.includes("Markdown Content:")
+    ? markdown.split("Markdown Content:").slice(1).join("Markdown Content:")
+    : markdown;
+
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line === "%" || /cashback/i.test(line) || /^Aberto\b/i.test(line)) continue;
+
+    const imageMatch = line.match(/!\[[^\]]*\]\((https?:\/\/[^)]+)\)/i);
+    if (imageMatch && currentProduct && !currentProduct.image_url && !imageMatch[1].includes("item_no_image")) {
+      currentProduct.image_url = imageMatch[1];
+      continue;
+    }
+
+    if (line.startsWith("## ")) {
+      flushDescription();
+      const categoryName = cleanMarkdownText(line) || "Produtos";
+      ensureCategory(categoryName);
+      currentProduct = null;
+      continue;
+    }
+
+    if (line.startsWith("### ")) {
+      flushDescription();
+      const name = cleanMarkdownText(line);
+      if (!name) continue;
+      const category = currentCategory || ensureCategory();
+      currentProduct = { name, price: 0, image_url: "" };
+      category.products.push(currentProduct);
+      continue;
+    }
+
+    const price = parsePrice(line);
+    if (typeof price === "number" && currentProduct) {
+      currentProduct.price = price;
+      continue;
+    }
+
+    if (currentProduct && !line.startsWith("!")) {
+      descriptionLines.push(cleanMarkdownText(line));
+    }
+  }
+
+  flushDescription();
+  return { categories: categories.filter((category) => category.products.length > 0) };
+}
+
 /** Extract image URLs from HTML, resolving relative paths */
 function extractImageUrls(html: string, baseUrl: string): Map<string, string[]> {
   const imageMap = new Map<string, string[]>();
@@ -182,37 +281,32 @@ serve(async (req) => {
   }
 
   try {
-    const { url, cuisine_type, custom_cuisine, mode } = await req.json();
+    const { url, cuisine_type, custom_cuisine, mode, page_content } = await req.json();
 
     if (!url || typeof url !== "string") {
-      return new Response(
-        JSON.stringify({ error: "URL é obrigatória" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "URL é obrigatória" });
     }
 
     // Validate URL
     try {
       new URL(url);
     } catch {
-      return new Response(
-        JSON.stringify({ error: "URL inválida" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "URL inválida" });
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "LOVABLE_API_KEY não configurada" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "LOVABLE_API_KEY não configurada" });
     }
 
-    // Step 1: Fetch the webpage content
-    console.log("Fetching URL:", url);
-    let pageContent: string;
-    try {
+    const isComplements = mode === "complements";
+
+    // Step 1: Fetch the webpage content, unless the browser already supplied rendered markdown/text.
+    let pageContent: string = typeof page_content === "string" ? page_content : "";
+    if (pageContent) {
+      console.log("Using supplied page content for URL:", url);
+    } else try {
+      console.log("Fetching URL:", url);
       const pageResp = await fetch(url, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -222,24 +316,50 @@ serve(async (req) => {
         redirect: "follow",
       });
 
-      if (!pageResp.ok) {
-        return new Response(
-          JSON.stringify({ error: `Não foi possível acessar o site (HTTP ${pageResp.status})` }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      if (pageResp.ok) {
+        pageContent = await pageResp.text();
+      } else if (pageResp.status === 401 || pageResp.status === 403 || pageResp.status === 429) {
+        console.log(`Direct fetch blocked with HTTP ${pageResp.status}, trying readable proxy`);
+        for (const proxyUrl of toReadableUrlProxies(url)) {
+          const proxyResp = await fetch(proxyUrl, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Accept": "text/plain,text/markdown,text/html,*/*;q=0.8",
+              "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+            },
+            redirect: "follow",
+          });
 
-      pageContent = await pageResp.text();
+          if (proxyResp.ok) {
+            const proxyContent = await proxyResp.text();
+            if (proxyContent.length > 500 && !/cf-error-code|Just a moment/i.test(proxyContent)) {
+              pageContent = proxyContent;
+              break;
+            }
+          }
+          console.log(`Readable proxy failed: ${proxyResp.status} ${proxyUrl}`);
+        }
+
+        if (!pageContent) {
+          return jsonResponse({ error: `Não foi possível acessar o site (HTTP ${pageResp.status})` });
+        }
+      } else {
+        return jsonResponse({ error: `Não foi possível acessar o site (HTTP ${pageResp.status})` });
+      }
     } catch (fetchErr) {
       console.error("Fetch error:", fetchErr);
-      return new Response(
-        JSON.stringify({ error: "Não foi possível acessar o site. Verifique se o link está correto." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Não foi possível acessar o site. Verifique se o link está correto." });
+    }
+
+    if (!isComplements && /pedido\.anota\.ai\/loja\//i.test(url)) {
+      const anotaMenu = parseAnotaAiMarkdown(pageContent);
+      if (anotaMenu.categories.length > 0) {
+        console.log(`Parsed Anota.ai menu directly: ${anotaMenu.categories.length} categories`);
+        return jsonResponse(anotaMenu);
+      }
     }
 
     // Extract image URLs from raw HTML before stripping tags
-    const isComplements = mode === "complements";
     const imageUrls = !isComplements ? extractImageUrls(pageContent, url) : new Map();
     const allImagesList = imageUrls.get("_all") || [];
     console.log(`Found ${allImagesList.length} product-candidate images`);
@@ -302,10 +422,7 @@ serve(async (req) => {
     }
 
     if (truncatedContent.length < 50) {
-      return new Response(
-        JSON.stringify({ error: "Não foi possível extrair conteúdo do site. O site pode usar JavaScript para renderizar (SPA) ou estar protegido." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Não foi possível extrair conteúdo do site. O site pode usar JavaScript para renderizar (SPA) ou estar protegido." });
     }
 
     console.log("Content length:", truncatedContent.length, "Image context length:", imageContext.length);
@@ -332,11 +449,12 @@ serve(async (req) => {
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Lovable-API-Key": LOVABLE_API_KEY,
+          "X-Lovable-AIG-SDK": "openai-compatible-rest",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "google/gemini-3-flash-preview",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userContent },
@@ -349,23 +467,14 @@ serve(async (req) => {
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em alguns segundos." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ error: "Limite de requisições excedido. Tente novamente em alguns segundos." });
       }
       if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Créditos insuficientes." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ error: "Créditos insuficientes." });
       }
       const errorText = await response.text();
       console.error("AI Gateway error:", response.status, errorText);
-      return new Response(
-        JSON.stringify({ error: "Erro ao processar com IA" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Erro ao processar com IA" });
     }
 
     const data = await response.json();
@@ -373,10 +482,7 @@ serve(async (req) => {
 
     if (!toolCall?.function?.arguments) {
       console.error("No tool call in response:", JSON.stringify(data));
-      return new Response(
-        JSON.stringify({ error: "IA não retornou dados estruturados" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "IA não retornou dados estruturados" });
     }
 
     const menuData = JSON.parse(toolCall.function.arguments);
@@ -386,9 +492,6 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("digitize-menu-url error:", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: e instanceof Error ? e.message : "Erro desconhecido" });
   }
 });
