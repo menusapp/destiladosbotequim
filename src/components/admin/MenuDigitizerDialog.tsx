@@ -65,6 +65,18 @@ const cuisineTypes = [
 
 type ImportSource = "photo" | "url";
 
+const fetchReadablePageContent = async (url: string) => {
+  if (!/pedido\.anota\.ai\/loja\//i.test(url)) return undefined;
+
+  const response = await fetch(`https://r.jina.ai/http://${url}`, {
+    headers: { Accept: "text/plain,text/markdown,*/*" },
+  });
+
+  if (!response.ok) return undefined;
+  const text = await response.text();
+  return text.length > 500 ? text : undefined;
+};
+
 const MenuDigitizerDialog = ({
   open,
   onOpenChange,
@@ -162,9 +174,12 @@ const MenuDigitizerDialog = ({
     if (!menuUrl.trim()) return;
     setIsAnalyzing(true);
     try {
+      const trimmedUrl = menuUrl.trim();
+      const pageContent = await fetchReadablePageContent(trimmedUrl);
       const { data, error } = await supabase.functions.invoke("digitize-menu-url", {
         body: {
-          url: menuUrl.trim(),
+          url: trimmedUrl,
+          page_content: pageContent,
           cuisine_type: cuisineType,
           custom_cuisine: cuisineType === "outros" ? customCuisine : undefined,
           mode,
