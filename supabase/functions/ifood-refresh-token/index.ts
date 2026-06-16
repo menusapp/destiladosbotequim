@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     }
 
     console.log("[ifood-refresh] Calling iFood token endpoint for restaurant:", restaurant_id);
-    console.log("[ifood-refresh] Using refresh_token (first 10 chars):", config.refresh_token.substring(0, 10));
+    console.log("[ifood-refresh] Refresh token present:", Boolean(config.refresh_token));
 
     const response = await fetch(`${IFOOD_API}/authentication/v1.0/oauth/token`, {
       method: "POST",
@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
     console.log("[ifood-refresh] iFood response status:", response.status);
 
     const responseText = await response.text();
-    console.log("[ifood-refresh] iFood response body:", responseText);
+    console.log("[ifood-refresh] iFood response body:", response.ok ? "[redacted token response]" : responseText);
 
     if (!response.ok) {
       console.error("[ifood-refresh] Refresh FAILED:", responseText);
