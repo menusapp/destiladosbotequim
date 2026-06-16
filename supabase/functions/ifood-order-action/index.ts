@@ -124,6 +124,12 @@ Deno.serve(async (req) => {
       fetchOptions.body = JSON.stringify(body);
     }
 
+    // dispatch: iFood requires { deliveredBy: "MERCHANT" } when the
+    // merchant performs the delivery (logística própria do restaurante).
+    if (action === "dispatch") {
+      fetchOptions.body = JSON.stringify({ deliveredBy: "MERCHANT" });
+    }
+
     const response = await fetch(url, fetchOptions);
     const responseText = await response.text();
     auditLog({
