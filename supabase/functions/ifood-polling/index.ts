@@ -13,6 +13,39 @@ function normalize(s: string | null | undefined): string {
   return (s || "").trim().toUpperCase().replace(/\s+/g, " ");
 }
 
+function auditLog(input: {
+  merchantId?: string | null;
+  tokenMerchantId?: string | null;
+  orderId?: string | null;
+  action: string;
+  endpoint: string;
+  status?: number | null;
+  response?: unknown;
+}) {
+  const responseBody = typeof input.response === "string"
+    ? input.response
+    : JSON.stringify(input.response ?? null);
+  console.log(
+    `[IFOOD_AUDIT] merchant_id=${input.merchantId ?? "null"} token_merchant_id=${input.tokenMerchantId ?? "null"} order_id=${input.orderId ?? "null"} action=${input.action} endpoint=${input.endpoint} status=${input.status ?? "null"} response=${responseBody.slice(0, 2000)} timestamp=${new Date().toISOString()}`
+  );
+}
+
+function extractMerchantIdFromToken(accessToken?: string | null): string | null {
+  if (!accessToken) return null;
+  try {
+    const jwtParts = accessToken.split(".");
+    if (jwtParts.length < 2) return null;
+    const payload = JSON.parse(atob(jwtParts[1]));
+    const merchantScope = payload.merchant_scope;
+    if (Array.isArray(merchantScope) && merchantScope.length > 0) {
+      return String(merchantScope[0]).split(":")[0] || null;
+    }
+    return payload.merchant_id || payload.merchantId || null;
+  } catch (_) {
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -40,27 +73,24 @@ Deno.serve(async (req) => {
     }
 
     // Resolve merchant_id: from DB or extract from JWT
-    let merchantId = config.merchant_id;
-    if (!merchantId && config.access_token) {
-      try {
-        const jwtParts = config.access_token.split(".");
-        if (jwtParts.length >= 2) {
-          const payload = JSON.parse(atob(jwtParts[1]));
-          const merchantScope = payload.merchant_scope;
-          if (Array.isArray(merchantScope) && merchantScope.length > 0) {
-            merchantId = merchantScope[0].split(":")[0];
-          }
-          if (!merchantId) {
-            merchantId = payload.merchant_id || payload.merchantId || null;
-          }
-          if (merchantId) {
-            await supabase
-              .from("ifood_config")
-              .update({ merchant_id: merchantId })
-              .eq("restaurant_id", restaurant_id);
-          }
-        }
-      } catch (_) { /* JWT decode failed */ }
+    let tokenMerchantId = extractMerchantIdFromToken(config.access_token);
+    let merchantId = config.merchant_id || tokenMerchantId;
+    if (!config.merchant_id && merchantId) {
+      await supabase
+        .from("ifood_config")
+        .update({ merchant_id: merchantId })
+        .eq("restaurant_id", restaurant_id);
+    }
+    if (config.merchant_id && tokenMerchantId && config.merchant_id !== tokenMerchantId) {
+      auditLog({
+        merchantId: config.merchant_id,
+        tokenMerchantId,
+        orderId: null,
+        action: "merchant_mismatch",
+        endpoint: "ifood_config.access_token",
+        status: null,
+        response: { restaurant_id, db_merchant_id: config.merchant_id, token_merchant_id: tokenMerchantId },
+      });
     }
 
     if (!merchantId) {
@@ -85,7 +115,8 @@ Deno.serve(async (req) => {
         );
       }
       try {
-        const refreshRes = await fetch(`${IFOOD_API}/authentication/v1.0/oauth/token`, {
+        const refreshEndpoint = `/authentication/v1.0/oauth/token`;
+        const refreshRes = await fetch(`${IFOOD_API}${refreshEndpoint}`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({
@@ -95,15 +126,24 @@ Deno.serve(async (req) => {
             refreshToken: config.refresh_token,
           }),
         });
+        const refreshText = await refreshRes.text();
+        auditLog({
+          merchantId,
+          tokenMerchantId,
+          orderId: null,
+          action: "refresh_token",
+          endpoint: refreshEndpoint,
+          status: refreshRes.status,
+          response: refreshRes.ok ? { success: true, token_response_redacted: true } : refreshText || null,
+        });
         if (!refreshRes.ok) {
-          const errText = await refreshRes.text();
-          console.error("[ifood-polling] Refresh failed:", errText);
+          console.error("[ifood-polling] Refresh failed:", refreshText);
           return new Response(
-            JSON.stringify({ error: "Token refresh failed. Reconnect iFood.", details: errText }),
+            JSON.stringify({ error: "Token refresh failed. Reconnect iFood.", details: refreshText }),
             { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        const tokenData = await refreshRes.json();
+        const tokenData = refreshText ? JSON.parse(refreshText) : null;
         if (!tokenData.accessToken) {
           return new Response(
             JSON.stringify({ error: "Invalid token response from iFood" }),
@@ -111,6 +151,7 @@ Deno.serve(async (req) => {
           );
         }
         accessToken = tokenData.accessToken;
+        tokenMerchantId = extractMerchantIdFromToken(accessToken) || tokenMerchantId;
         const newExpiresAt = new Date(Date.now() + tokenData.expiresIn * 1000).toISOString();
         await supabase.from("ifood_config").update({
           access_token: tokenData.accessToken,
@@ -129,12 +170,24 @@ Deno.serve(async (req) => {
     }
 
     // Poll events
-    const eventsRes = await fetch(`${IFOOD_API}/events/v1.0/events:polling`, {
+    const pollingEndpoint = `/events/v1.0/events:polling`;
+    const eventsRes = await fetch(`${IFOOD_API}${pollingEndpoint}`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "X-Polling-Merchants": merchantId,
       },
+    });
+
+    const eventsText = await eventsRes.text();
+    auditLog({
+      merchantId,
+      tokenMerchantId,
+      orderId: null,
+      action: "polling",
+      endpoint: pollingEndpoint,
+      status: eventsRes.status,
+      response: eventsText || null,
     });
 
     if (!eventsRes.ok) {
@@ -150,7 +203,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    const eventsText = await eventsRes.text();
     const events = eventsText ? JSON.parse(eventsText) : [];
 
     if (!Array.isArray(events) || events.length === 0) {
@@ -208,6 +260,15 @@ Deno.serve(async (req) => {
       const eventCode = event.fullCode || event.code || "";
       const orderId = event.orderId;
       console.log("Evento recebido:", JSON.stringify({ id: event.id, code: event.code, fullCode: event.fullCode, orderId: event.orderId }));
+      auditLog({
+        merchantId,
+        tokenMerchantId,
+        orderId,
+        action: `event_${eventCode || "unknown"}`,
+        endpoint: pollingEndpoint,
+        status: eventsRes.status,
+        response: { event_id: event.id, event_merchant_id: event.merchantId ?? null, created_at: event.createdAt ?? null },
+      });
 
       if (eventCode === "PLACED") {
         // Check if order already exists
@@ -221,16 +282,17 @@ Deno.serve(async (req) => {
 
         // Get order details
         try {
-          const orderRes = await fetch(`${IFOOD_API}/order/v1.0/orders/${orderId}`, {
+          const orderEndpoint = `/order/v1.0/orders/${orderId}`;
+          const orderRes = await fetch(`${IFOOD_API}${orderEndpoint}`, {
             headers: { Authorization: `Bearer ${accessToken}` },
           });
+          const orderText = await orderRes.text();
+          auditLog({ merchantId, tokenMerchantId, orderId, action: "get_order_details", endpoint: orderEndpoint, status: orderRes.status, response: orderText || null });
 
           if (!orderRes.ok) {
-            await orderRes.text();
             continue;
           }
 
-          const orderText = await orderRes.text();
           if (!orderText) continue;
           const orderData = JSON.parse(orderText);
 
@@ -703,13 +765,24 @@ Deno.serve(async (req) => {
     // Acknowledge events
     if (eventIds.length > 0) {
       try {
-        await fetch(`${IFOOD_API}/events/v1.0/events/acknowledgment`, {
+        const ackEndpoint = `/events/v1.0/events/acknowledgment`;
+        const ackRes = await fetch(`${IFOOD_API}${ackEndpoint}`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify(eventIds),
+        });
+        const ackText = await ackRes.text();
+        auditLog({
+          merchantId,
+          tokenMerchantId,
+          orderId: null,
+          action: "acknowledgment",
+          endpoint: ackEndpoint,
+          status: ackRes.status,
+          response: ackText || { event_ids: eventIds },
         });
       } catch (e) {
         console.error("Failed to acknowledge events:", e);
