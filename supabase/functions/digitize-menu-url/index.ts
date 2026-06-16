@@ -281,7 +281,7 @@ serve(async (req) => {
   }
 
   try {
-    const { url, cuisine_type, custom_cuisine, mode } = await req.json();
+    const { url, cuisine_type, custom_cuisine, mode, page_content } = await req.json();
 
     if (!url || typeof url !== "string") {
       return jsonResponse({ error: "URL é obrigatória" });
@@ -301,10 +301,12 @@ serve(async (req) => {
 
     const isComplements = mode === "complements";
 
-    // Step 1: Fetch the webpage content
-    console.log("Fetching URL:", url);
-    let pageContent: string;
-    try {
+    // Step 1: Fetch the webpage content, unless the browser already supplied rendered markdown/text.
+    let pageContent: string = typeof page_content === "string" ? page_content : "";
+    if (pageContent) {
+      console.log("Using supplied page content for URL:", url);
+    } else try {
+      console.log("Fetching URL:", url);
       const pageResp = await fetch(url, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
