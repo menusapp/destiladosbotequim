@@ -368,6 +368,24 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
             {needsPayment && <Badge variant="destructive" className="text-xs">Falta pagamento</Badge>}
           </div>
 
+          {order.ifood_source && (
+            <div className="rounded-lg border border-[#EA1D2C]/40 bg-[#EA1D2C]/5 p-3 space-y-1">
+              <p className="font-semibold text-sm text-[#EA1D2C]">Dados da Integração</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <p><span className="text-muted-foreground">Origem:</span> <strong>iFood</strong></p>
+                {order.ifood_display_id && (
+                  <p><span className="text-muted-foreground">Display ID iFood:</span> <strong className="font-mono">{order.ifood_display_id}</strong></p>
+                )}
+                {order.ifood_order_id && (
+                  <p className="sm:col-span-2 break-all"><span className="text-muted-foreground">Order ID iFood:</span> <strong className="font-mono">{order.ifood_order_id}</strong></p>
+                )}
+                {order.ifood_merchant_id && (
+                  <p className="sm:col-span-2 break-all"><span className="text-muted-foreground">Merchant ID:</span> <strong className="font-mono">{order.ifood_merchant_id}</strong></p>
+                )}
+              </div>
+            </div>
+          )}
+
           <Separator />
 
           {/* Ações do Pedido — sempre visível */}
