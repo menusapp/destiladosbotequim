@@ -340,11 +340,12 @@ serve(async (req) => {
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Lovable-API-Key": LOVABLE_API_KEY,
+          "X-Lovable-AIG-SDK": "openai-compatible-rest",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+          model: "google/gemini-3-flash-preview",
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userContent },
@@ -357,23 +358,14 @@ serve(async (req) => {
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em alguns segundos." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ error: "Limite de requisições excedido. Tente novamente em alguns segundos." });
       }
       if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Créditos insuficientes." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ error: "Créditos insuficientes." });
       }
       const errorText = await response.text();
       console.error("AI Gateway error:", response.status, errorText);
-      return new Response(
-        JSON.stringify({ error: "Erro ao processar com IA" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "Erro ao processar com IA" });
     }
 
     const data = await response.json();
@@ -381,10 +373,7 @@ serve(async (req) => {
 
     if (!toolCall?.function?.arguments) {
       console.error("No tool call in response:", JSON.stringify(data));
-      return new Response(
-        JSON.stringify({ error: "IA não retornou dados estruturados" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return jsonResponse({ error: "IA não retornou dados estruturados" });
     }
 
     const menuData = JSON.parse(toolCall.function.arguments);
@@ -394,9 +383,6 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("digitize-menu-url error:", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Erro desconhecido" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse({ error: e instanceof Error ? e.message : "Erro desconhecido" });
   }
 });
