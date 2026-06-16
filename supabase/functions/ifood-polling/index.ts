@@ -162,12 +162,24 @@ Deno.serve(async (req) => {
     }
 
     // Poll events
-    const eventsRes = await fetch(`${IFOOD_API}/events/v1.0/events:polling`, {
+    const pollingEndpoint = `/events/v1.0/events:polling`;
+    const eventsRes = await fetch(`${IFOOD_API}${pollingEndpoint}`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "X-Polling-Merchants": merchantId,
       },
+    });
+
+    const eventsText = await eventsRes.text();
+    auditLog({
+      merchantId,
+      tokenMerchantId,
+      orderId: null,
+      action: "polling",
+      endpoint: pollingEndpoint,
+      status: eventsRes.status,
+      response: eventsText || null,
     });
 
     if (!eventsRes.ok) {
@@ -183,7 +195,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    const eventsText = await eventsRes.text();
     const events = eventsText ? JSON.parse(eventsText) : [];
 
     if (!Array.isArray(events) || events.length === 0) {
