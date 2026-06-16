@@ -318,19 +318,29 @@ serve(async (req) => {
         pageContent = await pageResp.text();
       } else if (pageResp.status === 401 || pageResp.status === 403 || pageResp.status === 429) {
         console.log(`Direct fetch blocked with HTTP ${pageResp.status}, trying readable proxy`);
-        const proxyResp = await fetch(toReadableUrlProxy(url), {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "text/plain,text/markdown,text/html,*/*;q=0.8",
-            "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
-          },
-          redirect: "follow",
-        });
+        for (const proxyUrl of toReadableUrlProxies(url)) {
+          const proxyResp = await fetch(proxyUrl, {
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+              "Accept": "text/plain,text/markdown,text/html,*/*;q=0.8",
+              "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+            },
+            redirect: "follow",
+          });
 
-        if (!proxyResp.ok) {
+          if (proxyResp.ok) {
+            const proxyContent = await proxyResp.text();
+            if (proxyContent.length > 500 && !/cf-error-code|Just a moment/i.test(proxyContent)) {
+              pageContent = proxyContent;
+              break;
+            }
+          }
+          console.log(`Readable proxy failed: ${proxyResp.status} ${proxyUrl}`);
+        }
+
+        if (!pageContent) {
           return jsonResponse({ error: `Não foi possível acessar o site (HTTP ${pageResp.status})` });
         }
-        pageContent = await proxyResp.text();
       } else {
         return jsonResponse({ error: `Não foi possível acessar o site (HTTP ${pageResp.status})` });
       }
