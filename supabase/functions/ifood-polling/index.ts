@@ -757,13 +757,24 @@ Deno.serve(async (req) => {
     // Acknowledge events
     if (eventIds.length > 0) {
       try {
-        await fetch(`${IFOOD_API}/events/v1.0/events/acknowledgment`, {
+        const ackEndpoint = `/events/v1.0/events/acknowledgment`;
+        const ackRes = await fetch(`${IFOOD_API}${ackEndpoint}`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify(eventIds),
+        });
+        const ackText = await ackRes.text();
+        auditLog({
+          merchantId,
+          tokenMerchantId,
+          orderId: null,
+          action: "acknowledgment",
+          endpoint: ackEndpoint,
+          status: ackRes.status,
+          response: ackText || { event_ids: eventIds },
         });
       } catch (e) {
         console.error("Failed to acknowledge events:", e);
