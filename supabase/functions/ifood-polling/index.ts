@@ -13,6 +13,39 @@ function normalize(s: string | null | undefined): string {
   return (s || "").trim().toUpperCase().replace(/\s+/g, " ");
 }
 
+function auditLog(input: {
+  merchantId?: string | null;
+  tokenMerchantId?: string | null;
+  orderId?: string | null;
+  action: string;
+  endpoint: string;
+  status?: number | null;
+  response?: unknown;
+}) {
+  const responseBody = typeof input.response === "string"
+    ? input.response
+    : JSON.stringify(input.response ?? null);
+  console.log(
+    `[IFOOD_AUDIT] merchant_id=${input.merchantId ?? "null"} token_merchant_id=${input.tokenMerchantId ?? "null"} order_id=${input.orderId ?? "null"} action=${input.action} endpoint=${input.endpoint} status=${input.status ?? "null"} response=${responseBody.slice(0, 2000)} timestamp=${new Date().toISOString()}`
+  );
+}
+
+function extractMerchantIdFromToken(accessToken?: string | null): string | null {
+  if (!accessToken) return null;
+  try {
+    const jwtParts = accessToken.split(".");
+    if (jwtParts.length < 2) return null;
+    const payload = JSON.parse(atob(jwtParts[1]));
+    const merchantScope = payload.merchant_scope;
+    if (Array.isArray(merchantScope) && merchantScope.length > 0) {
+      return String(merchantScope[0]).split(":")[0] || null;
+    }
+    return payload.merchant_id || payload.merchantId || null;
+  } catch (_) {
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
