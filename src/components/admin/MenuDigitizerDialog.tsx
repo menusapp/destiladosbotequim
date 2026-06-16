@@ -68,13 +68,17 @@ type ImportSource = "photo" | "url";
 const fetchReadablePageContent = async (url: string) => {
   if (!/pedido\.anota\.ai\/loja\//i.test(url)) return undefined;
 
-  const response = await fetch(`https://r.jina.ai/http://${url}`, {
-    headers: { Accept: "text/plain,text/markdown,*/*" },
-  });
+  try {
+    const response = await fetch(`https://r.jina.ai/http://${url}`, {
+      headers: { Accept: "text/plain,text/markdown,*/*" },
+    });
 
-  if (!response.ok) return undefined;
-  const text = await response.text();
-  return text.length > 500 ? text : undefined;
+    if (!response.ok) return undefined;
+    const text = await response.text();
+    return text.length > 500 ? text : undefined;
+  } catch {
+    return undefined;
+  }
 };
 
 const MenuDigitizerDialog = ({
