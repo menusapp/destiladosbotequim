@@ -26,6 +26,17 @@ const complementCuisinePrompts: Record<string, string> = {
   outros: "Foque em itens COMPLEMENTARES: ingredientes extras, molhos, acompanhamentos adicionais.",
 };
 
+function jsonResponse(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function toReadableUrlProxy(url: string) {
+  return `https://r.jina.ai/http://${url}`;
+}
+
 /** Extract image URLs from HTML, resolving relative paths */
 function extractImageUrls(html: string, baseUrl: string): Map<string, string[]> {
   const imageMap = new Map<string, string[]>();
