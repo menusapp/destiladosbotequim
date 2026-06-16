@@ -50,9 +50,10 @@ const Landing = () => {
     setLoading(true);
 
     try {
+      const cleanUsername = username.trim();
       const { data, error } = await (supabase as any)
         .rpc('validate_restaurant_credentials', {
-          p_username: username,
+          p_username: cleanUsername,
           p_password: password
         });
 
@@ -69,7 +70,7 @@ const Landing = () => {
         await cacheRestaurantSlug(restaurant_id);
         toast.success(`Bem-vindo ao ${restaurant_name}!`);
         navigate('/login/staff');
-      } else if (username.trim().toUpperCase() === "CEO" && password === "CEO123") {
+      } else if (cleanUsername.toUpperCase() === "CEO" && password === "CEO123") {
         // CEO master access - redirect to CEO user login
         localStorage.setItem('ceo_access', 'true');
         navigate('/login/ceo');
