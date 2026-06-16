@@ -64,6 +64,8 @@ interface Order {
   loyalty_points_used?: number;
   ifood_source?: boolean;
   ifood_order_id?: string;
+  ifood_display_id?: string | null;
+  ifood_merchant_id?: string | null;
   dd_source?: boolean;
   dd_order_id?: string;
   dd_scheduled_for?: string;
