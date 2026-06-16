@@ -294,6 +294,8 @@ serve(async (req) => {
       return jsonResponse({ error: "LOVABLE_API_KEY não configurada" });
     }
 
+    const isComplements = mode === "complements";
+
     // Step 1: Fetch the webpage content
     console.log("Fetching URL:", url);
     let pageContent: string;
@@ -341,7 +343,6 @@ serve(async (req) => {
     }
 
     // Extract image URLs from raw HTML before stripping tags
-    const isComplements = mode === "complements";
     const imageUrls = !isComplements ? extractImageUrls(pageContent, url) : new Map();
     const allImagesList = imageUrls.get("_all") || [];
     console.log(`Found ${allImagesList.length} product-candidate images`);
