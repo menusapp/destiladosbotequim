@@ -73,27 +73,24 @@ Deno.serve(async (req) => {
     }
 
     // Resolve merchant_id: from DB or extract from JWT
-    let merchantId = config.merchant_id;
-    if (!merchantId && config.access_token) {
-      try {
-        const jwtParts = config.access_token.split(".");
-        if (jwtParts.length >= 2) {
-          const payload = JSON.parse(atob(jwtParts[1]));
-          const merchantScope = payload.merchant_scope;
-          if (Array.isArray(merchantScope) && merchantScope.length > 0) {
-            merchantId = merchantScope[0].split(":")[0];
-          }
-          if (!merchantId) {
-            merchantId = payload.merchant_id || payload.merchantId || null;
-          }
-          if (merchantId) {
-            await supabase
-              .from("ifood_config")
-              .update({ merchant_id: merchantId })
-              .eq("restaurant_id", restaurant_id);
-          }
-        }
-      } catch (_) { /* JWT decode failed */ }
+    let tokenMerchantId = extractMerchantIdFromToken(config.access_token);
+    let merchantId = config.merchant_id || tokenMerchantId;
+    if (!config.merchant_id && merchantId) {
+      await supabase
+        .from("ifood_config")
+        .update({ merchant_id: merchantId })
+        .eq("restaurant_id", restaurant_id);
+    }
+    if (config.merchant_id && tokenMerchantId && config.merchant_id !== tokenMerchantId) {
+      auditLog({
+        merchantId: config.merchant_id,
+        tokenMerchantId,
+        orderId: null,
+        action: "merchant_mismatch",
+        endpoint: "ifood_config.access_token",
+        status: null,
+        response: { restaurant_id, db_merchant_id: config.merchant_id, token_merchant_id: tokenMerchantId },
+      });
     }
 
     if (!merchantId) {
@@ -118,7 +115,8 @@ Deno.serve(async (req) => {
         );
       }
       try {
-        const refreshRes = await fetch(`${IFOOD_API}/authentication/v1.0/oauth/token`, {
+        const refreshEndpoint = `/authentication/v1.0/oauth/token`;
+        const refreshRes = await fetch(`${IFOOD_API}${refreshEndpoint}`, {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams({
@@ -128,15 +126,16 @@ Deno.serve(async (req) => {
             refreshToken: config.refresh_token,
           }),
         });
+        const refreshText = await refreshRes.text();
+        auditLog({ merchantId, tokenMerchantId, orderId: null, action: "refresh_token", endpoint: refreshEndpoint, status: refreshRes.status, response: refreshText || null });
         if (!refreshRes.ok) {
-          const errText = await refreshRes.text();
-          console.error("[ifood-polling] Refresh failed:", errText);
+          console.error("[ifood-polling] Refresh failed:", refreshText);
           return new Response(
-            JSON.stringify({ error: "Token refresh failed. Reconnect iFood.", details: errText }),
+            JSON.stringify({ error: "Token refresh failed. Reconnect iFood.", details: refreshText }),
             { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        const tokenData = await refreshRes.json();
+        const tokenData = refreshText ? JSON.parse(refreshText) : null;
         if (!tokenData.accessToken) {
           return new Response(
             JSON.stringify({ error: "Invalid token response from iFood" }),
@@ -144,6 +143,7 @@ Deno.serve(async (req) => {
           );
         }
         accessToken = tokenData.accessToken;
+        tokenMerchantId = extractMerchantIdFromToken(accessToken) || tokenMerchantId;
         const newExpiresAt = new Date(Date.now() + tokenData.expiresIn * 1000).toISOString();
         await supabase.from("ifood_config").update({
           access_token: tokenData.accessToken,
