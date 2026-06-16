@@ -104,7 +104,7 @@ function parseAnotaAiMarkdown(markdown: string) {
       flushDescription();
       const name = cleanMarkdownText(line);
       if (!name) continue;
-      const category = ensureCategory();
+      const category = currentCategory || ensureCategory();
       currentProduct = { name, price: 0, image_url: "" };
       category.products.push(currentProduct);
       continue;
