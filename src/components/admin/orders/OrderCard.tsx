@@ -55,6 +55,8 @@ export interface OrderCardOrder {
   coupon_discount?: number;
   loyalty_points_used?: number;
   ifood_source?: boolean;
+  ifood_display_id?: string | null;
+  ifood_order_id?: string | null;
   dd_source?: boolean;
   dd_scheduled_for?: string;
 }
