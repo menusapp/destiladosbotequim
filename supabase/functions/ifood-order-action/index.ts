@@ -8,6 +8,39 @@ const corsHeaders = {
 
 const IFOOD_API = "https://merchant-api.ifood.com.br";
 
+function auditLog(input: {
+  merchantId?: string | null;
+  tokenMerchantId?: string | null;
+  orderId?: string | null;
+  action: string;
+  endpoint: string;
+  status?: number | null;
+  response?: unknown;
+}) {
+  const responseBody = typeof input.response === "string"
+    ? input.response
+    : JSON.stringify(input.response ?? null);
+  console.log(
+    `[IFOOD_AUDIT] merchant_id=${input.merchantId ?? "null"} token_merchant_id=${input.tokenMerchantId ?? "null"} order_id=${input.orderId ?? "null"} action=${input.action} endpoint=${input.endpoint} status=${input.status ?? "null"} response=${responseBody.slice(0, 2000)} timestamp=${new Date().toISOString()}`
+  );
+}
+
+function extractMerchantIdFromToken(accessToken?: string | null): string | null {
+  if (!accessToken) return null;
+  try {
+    const jwtParts = accessToken.split(".");
+    if (jwtParts.length < 2) return null;
+    const payload = JSON.parse(atob(jwtParts[1]));
+    const merchantScope = payload.merchant_scope;
+    if (Array.isArray(merchantScope) && merchantScope.length > 0) {
+      return String(merchantScope[0]).split(":")[0] || null;
+    }
+    return payload.merchant_id || payload.merchantId || null;
+  } catch (_) {
+    return null;
+  }
+}
+
 const ACTION_MAP: Record<string, { method: string; path: string; newStatus?: string }> = {
   confirm: { method: "POST", path: "confirm", newStatus: "accepted" },
   start_preparation: { method: "POST", path: "startPreparation", newStatus: "preparing" },
@@ -47,7 +80,7 @@ Deno.serve(async (req) => {
     // Get token
     const { data: config } = await supabase
       .from("ifood_config")
-      .select("access_token")
+      .select("access_token, merchant_id")
       .eq("restaurant_id", restaurant_id)
       .single();
 
@@ -58,8 +91,22 @@ Deno.serve(async (req) => {
       );
     }
 
+    const tokenMerchantId = extractMerchantIdFromToken(config.access_token);
+    if (config.merchant_id && tokenMerchantId && config.merchant_id !== tokenMerchantId) {
+      auditLog({
+        merchantId: config.merchant_id,
+        tokenMerchantId,
+        orderId: ifood_order_id,
+        action: "merchant_mismatch",
+        endpoint: "ifood_config.access_token",
+        status: null,
+        response: { restaurant_id, db_merchant_id: config.merchant_id, token_merchant_id: tokenMerchantId },
+      });
+    }
+
     // Build request
-    const url = `${IFOOD_API}/order/v1.0/orders/${ifood_order_id}/${actionConfig.path}`;
+    const endpoint = `/order/v1.0/orders/${ifood_order_id}/${actionConfig.path}`;
+    const url = `${IFOOD_API}${endpoint}`;
     const fetchOptions: RequestInit = {
       method: actionConfig.method,
       headers: {
@@ -78,9 +125,21 @@ Deno.serve(async (req) => {
     }
 
     const response = await fetch(url, fetchOptions);
+    const responseText = await response.text();
+    auditLog({
+      merchantId: config.merchant_id,
+      tokenMerchantId,
+      orderId: ifood_order_id,
+      action,
+      endpoint,
+      status: response.status,
+      response: responseText || null,
+    });
 
     if (action === "get_cancellation_reasons") {
-      const reasons = response.ok ? await response.json() : [];
+      let parsed: any = null;
+      try { parsed = responseText ? JSON.parse(responseText) : null; } catch (_) { parsed = null; }
+      const reasons = response.ok ? (Array.isArray(parsed) ? parsed : (parsed?.reasons || [])) : [];
       return new Response(
         JSON.stringify({ reasons }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -88,9 +147,8 @@ Deno.serve(async (req) => {
     }
 
     if (!response.ok) {
-      const errorText = await response.text();
       return new Response(
-        JSON.stringify({ error: `iFood action failed: ${errorText}` }),
+        JSON.stringify({ error: `iFood action failed: ${responseText}` }),
         { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
