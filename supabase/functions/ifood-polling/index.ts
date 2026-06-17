@@ -902,7 +902,7 @@ Deno.serve(async (req) => {
           try {
             const { data: localOrder } = await supabase
               .from("orders")
-              .select("id, status, delivery_type, ifood_order_timing, dd_scheduled_for")
+              .select("id, status, delivery_type, dd_scheduled_for")
               .eq("ifood_order_id", ifoodOrderId)
               .eq("restaurant_id", restaurant_id)
               .maybeSingle();
@@ -912,9 +912,8 @@ Deno.serve(async (req) => {
               continue;
             }
 
-            // Derive order timing: prefer stored column if present; otherwise infer from dd_scheduled_for
-            const orderTiming = (localOrder as any).ifood_order_timing
-              || (localOrder.dd_scheduled_for ? "SCHEDULED" : "IMMEDIATE");
+            // Infer order timing from dd_scheduled_for (SCHEDULED orders carry it set).
+            const orderTiming = localOrder.dd_scheduled_for ? "SCHEDULED" : "IMMEDIATE";
 
             await runAutoIfoodFlow({
               supabase,
