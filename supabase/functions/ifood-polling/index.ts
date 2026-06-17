@@ -369,11 +369,13 @@ Deno.serve(async (req) => {
 
     let newOrdersCount = 0;
     const eventIds: { id: string }[] = [];
+    const touchedIfoodOrderIds = new Set<string>();
 
     for (const event of events) {
       eventIds.push({ id: event.id });
       const eventCode = event.fullCode || event.code || "";
       const orderId = event.orderId;
+      if (orderId) touchedIfoodOrderIds.add(orderId);
       console.log("Evento recebido:", JSON.stringify({ id: event.id, code: event.code, fullCode: event.fullCode, orderId: event.orderId }));
       auditLog({
         merchantId,
