@@ -96,12 +96,18 @@ async function runAutoIfoodFlow(params: {
 
   console.log(`[IFOOD_AUTO_FLOW] start ${baseCtx}`);
 
-  const steps: Array<{ action: string; path: string; localStatus: LocalStatus; body?: Record<string, unknown> }> = [
+  // OPERATIONAL MODE (default): only confirm + startPreparation. The operator
+  // manually advances ready → dispatch from the admin panel.
+  // HOMOLOGATION MODE: full chain confirm → startPreparation → readyToPickup → dispatch
+  // for iFood certification scenarios only.
+  const allSteps: Array<{ action: string; path: string; localStatus: LocalStatus; body?: Record<string, unknown> }> = [
     { action: "confirm",           path: "confirm",         localStatus: "accepted" },
     { action: "start_preparation", path: "startPreparation", localStatus: "preparing" },
     { action: "ready_to_pickup",   path: "readyToPickup",   localStatus: "ready" },
     { action: "dispatch",          path: "dispatch",        localStatus: "out_for_delivery", body: { deliveredBy: "MERCHANT" } },
   ];
+  const steps = homologationMode ? allSteps : allSteps.slice(0, 2);
+
 
   const currentIdx = STEP_ORDER.indexOf((currentStatus ?? "pending") as LocalStatus);
   const startFromIdx = currentIdx < 0 ? 0 : currentIdx;
