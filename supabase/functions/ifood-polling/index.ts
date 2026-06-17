@@ -50,8 +50,12 @@ function extractMerchantIdFromToken(accessToken?: string | null): string | null 
  * Auto-execute the full iFood Order API transition chain for IMMEDIATE DELIVERY orders
  * when the restaurant has auto_accept_orders enabled.
  * Sequence: confirm → startPreparation → readyToPickup → dispatch
- * Each step is logged via [IFOOD_AUDIT] with merchant_id, order_id, action, endpoint, status, timestamp.
+ * Idempotent: skips steps already reflected in the local order status, so it can be
+ * safely invoked multiple times per polling cycle / per inbound event.
  */
+const STEP_ORDER = ["pending", "accepted", "preparing", "ready", "out_for_delivery"] as const;
+type LocalStatus = typeof STEP_ORDER[number];
+
 async function runAutoIfoodFlow(params: {
   supabase: any;
   accessToken: string;
@@ -59,35 +63,54 @@ async function runAutoIfoodFlow(params: {
   tokenMerchantId: string | null;
   ifoodOrderId: string;
   localOrderId: string;
-  deliveryType: "delivery" | "pickup";
-  isScheduled: boolean;
+  deliveryType: string | null;
+  orderTiming: string | null;
   autoAccept: boolean;
+  currentStatus: string | null;
 }): Promise<void> {
-  const { supabase, accessToken, merchantId, tokenMerchantId, ifoodOrderId, localOrderId, deliveryType, isScheduled, autoAccept } = params;
+  const {
+    supabase, accessToken, merchantId, tokenMerchantId,
+    ifoodOrderId, localOrderId, deliveryType, orderTiming, autoAccept, currentStatus,
+  } = params;
+
+  const baseCtx = `order_id=${ifoodOrderId} local_order_id=${localOrderId} current_status=${currentStatus ?? "null"} delivery_type=${deliveryType ?? "null"} order_timing=${orderTiming ?? "null"} auto_accept_orders=${autoAccept}`;
 
   if (!autoAccept) {
-    console.log(`[IFOOD_AUTO_FLOW] skip order_id=${ifoodOrderId} reason=auto_accept_disabled`);
+    console.log(`[IFOOD_AUTO_FLOW] skip ${baseCtx} reason=auto_accept_disabled`);
     return;
   }
-  if (isScheduled) {
-    console.log(`[IFOOD_AUTO_FLOW] skip order_id=${ifoodOrderId} reason=scheduled_order`);
+  if ((orderTiming ?? "").toUpperCase() === "SCHEDULED") {
+    console.log(`[IFOOD_AUTO_FLOW] skip ${baseCtx} reason=scheduled_order`);
     return;
   }
-  if (deliveryType !== "delivery") {
-    console.log(`[IFOOD_AUTO_FLOW] skip order_id=${ifoodOrderId} reason=not_delivery (delivery_type=${deliveryType})`);
+  if ((deliveryType ?? "").toLowerCase() !== "delivery") {
+    console.log(`[IFOOD_AUTO_FLOW] skip ${baseCtx} reason=not_delivery`);
+    return;
+  }
+  if (currentStatus === "cancelled" || currentStatus === "delivered" || currentStatus === "out_for_delivery") {
+    console.log(`[IFOOD_AUTO_FLOW] skip ${baseCtx} reason=already_advanced`);
     return;
   }
 
-  console.log(`[IFOOD_AUTO_FLOW] start order_id=${ifoodOrderId} delivery_type=${deliveryType}`);
+  console.log(`[IFOOD_AUTO_FLOW] start ${baseCtx}`);
 
-  const steps: Array<{ action: string; path: string; localStatus: string; body?: Record<string, unknown> }> = [
+  const steps: Array<{ action: string; path: string; localStatus: LocalStatus; body?: Record<string, unknown> }> = [
     { action: "confirm",           path: "confirm",         localStatus: "accepted" },
     { action: "start_preparation", path: "startPreparation", localStatus: "preparing" },
     { action: "ready_to_pickup",   path: "readyToPickup",   localStatus: "ready" },
     { action: "dispatch",          path: "dispatch",        localStatus: "out_for_delivery", body: { deliveredBy: "MERCHANT" } },
   ];
 
+  const currentIdx = STEP_ORDER.indexOf((currentStatus ?? "pending") as LocalStatus);
+  const startFromIdx = currentIdx < 0 ? 0 : currentIdx;
+
   for (const step of steps) {
+    const stepIdx = STEP_ORDER.indexOf(step.localStatus);
+    if (stepIdx <= startFromIdx) {
+      console.log(`[IFOOD_AUTO_FLOW] skip-step order_id=${ifoodOrderId} action=${step.action} reason=already_done`);
+      continue;
+    }
+
     const endpoint = `/order/v1.0/orders/${ifoodOrderId}/${step.path}`;
     const url = `${IFOOD_API}${endpoint}`;
     try {
@@ -109,15 +132,16 @@ async function runAutoIfoodFlow(params: {
         status: res.status,
         response: text || null,
       });
-      if (!res.ok) {
-        console.error(`[IFOOD_AUTO_FLOW] abort order_id=${ifoodOrderId} action=${step.action} status=${res.status}`);
+      // Treat 409 as already-in-state (idempotent) and continue advancing.
+      const okOrAlready = res.ok || res.status === 409;
+      if (!okOrAlready) {
+        console.error(`[IFOOD_AUTO_FLOW] error order_id=${ifoodOrderId} action=${step.action} status=${res.status} body=${text.slice(0, 300)}`);
         return;
       }
       await supabase
         .from("orders")
         .update({ status: step.localStatus })
         .eq("id", localOrderId);
-      // tiny delay between calls to respect iFood rate limits and event ordering
       await new Promise((r) => setTimeout(r, 400));
     } catch (e) {
       auditLog({
@@ -129,12 +153,12 @@ async function runAutoIfoodFlow(params: {
         status: null,
         response: { error: (e as Error).message },
       });
-      console.error(`[IFOOD_AUTO_FLOW] exception order_id=${ifoodOrderId} action=${step.action}:`, e);
+      console.error(`[IFOOD_AUTO_FLOW] error order_id=${ifoodOrderId} action=${step.action} exception=${(e as Error).message}`);
       return;
     }
   }
 
-  console.log(`[IFOOD_AUTO_FLOW] complete order_id=${ifoodOrderId}`);
+  console.log(`[IFOOD_AUTO_FLOW] complete ${baseCtx}`);
 }
 
 Deno.serve(async (req) => {
