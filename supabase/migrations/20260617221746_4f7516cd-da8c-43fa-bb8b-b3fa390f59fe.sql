@@ -1,0 +1,1 @@
+ALTER TABLE public.ifood_config ADD COLUMN IF NOT EXISTS homologation_mode boolean NOT NULL DEFAULT false;

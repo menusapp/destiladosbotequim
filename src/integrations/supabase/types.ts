@@ -1471,6 +1471,7 @@ export type Database = {
           authorization_code_verifier: string | null
           created_at: string | null
           enabled: boolean | null
+          homologation_mode: boolean
           id: string
           last_polling_at: string | null
           merchant_id: string | null
@@ -1484,6 +1485,7 @@ export type Database = {
           authorization_code_verifier?: string | null
           created_at?: string | null
           enabled?: boolean | null
+          homologation_mode?: boolean
           id?: string
           last_polling_at?: string | null
           merchant_id?: string | null
@@ -1497,6 +1499,7 @@ export type Database = {
           authorization_code_verifier?: string | null
           created_at?: string | null
           enabled?: boolean | null
+          homologation_mode?: boolean
           id?: string
           last_polling_at?: string | null
           merchant_id?: string | null
