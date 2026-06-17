@@ -951,15 +951,21 @@ Deno.serve(async (req) => {
     if (eventIds.length > 0) {
       try {
         const ackEndpoint = `/events/v1.0/events/acknowledgment`;
-        const ackRes = await fetch(`${IFOOD_API}${ackEndpoint}`, {
+        const ackPayload = JSON.stringify(eventIds);
+        const ackUrl = `${IFOOD_API}${ackEndpoint}`;
+        console.log(`[IFOOD_ACK] sending count=${eventIds.length} merchant_id=${merchantId} token_merchant_id=${tokenMerchantId} url=${ackUrl} payload=${ackPayload}`);
+        const ackRes = await fetch(ackUrl, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(eventIds),
+          body: ackPayload,
         });
         const ackText = await ackRes.text();
+        for (const ev of events) {
+          console.log(`[IFOOD_ACK] event_id=${ev.id} order_id=${ev.orderId ?? "null"} code=${ev.code ?? "null"} full_code=${ev.fullCode ?? "null"} http_status=${ackRes.status} ack_response=${(ackText || "").slice(0, 500)}`);
+        }
         auditLog({
           merchantId,
           tokenMerchantId,
@@ -970,7 +976,7 @@ Deno.serve(async (req) => {
           response: ackText || { event_ids: eventIds },
         });
       } catch (e) {
-        console.error("Failed to acknowledge events:", e);
+        console.error("[IFOOD_ACK] Failed to acknowledge events:", e);
       }
     }
 
