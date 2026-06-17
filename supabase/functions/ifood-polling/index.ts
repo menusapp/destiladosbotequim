@@ -66,14 +66,16 @@ async function runAutoIfoodFlow(params: {
   deliveryType: string | null;
   orderTiming: string | null;
   autoAccept: boolean;
+  homologationMode: boolean;
   currentStatus: string | null;
 }): Promise<void> {
   const {
     supabase, accessToken, merchantId, tokenMerchantId,
-    ifoodOrderId, localOrderId, deliveryType, orderTiming, autoAccept, currentStatus,
+    ifoodOrderId, localOrderId, deliveryType, orderTiming, autoAccept, homologationMode, currentStatus,
   } = params;
 
-  const baseCtx = `order_id=${ifoodOrderId} local_order_id=${localOrderId} current_status=${currentStatus ?? "null"} delivery_type=${deliveryType ?? "null"} order_timing=${orderTiming ?? "null"} auto_accept_orders=${autoAccept}`;
+  const baseCtx = `order_id=${ifoodOrderId} local_order_id=${localOrderId} current_status=${currentStatus ?? "null"} delivery_type=${deliveryType ?? "null"} order_timing=${orderTiming ?? "null"} auto_accept_orders=${autoAccept} homologation_mode=${homologationMode}`;
+
 
   if (!autoAccept) {
     console.log(`[IFOOD_AUTO_FLOW] skip ${baseCtx} reason=auto_accept_disabled`);
