@@ -885,6 +885,58 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── Post-loop AUTO-FLOW pass ─────────────────────────────────────────
+    // Runs once per unique iFood order touched in this batch, regardless of
+    // whether the event was a new INSERT (PLC) or just an UPDATE (CFM/PRS/RTP/DSP).
+    // Idempotent: runAutoIfoodFlow skips steps already reflected in the local status.
+    if (touchedIfoodOrderIds.size > 0) {
+      try {
+        const { data: rest } = await supabase
+          .from("restaurants")
+          .select("auto_accept_orders")
+          .eq("id", restaurant_id)
+          .maybeSingle();
+        const autoAccept = !!rest?.auto_accept_orders;
+
+        for (const ifoodOrderId of touchedIfoodOrderIds) {
+          try {
+            const { data: localOrder } = await supabase
+              .from("orders")
+              .select("id, status, delivery_type, ifood_order_timing, dd_scheduled_for")
+              .eq("ifood_order_id", ifoodOrderId)
+              .eq("restaurant_id", restaurant_id)
+              .maybeSingle();
+
+            if (!localOrder) {
+              console.log(`[IFOOD_AUTO_FLOW] skip order_id=${ifoodOrderId} reason=local_order_not_found`);
+              continue;
+            }
+
+            // Derive order timing: prefer stored column if present; otherwise infer from dd_scheduled_for
+            const orderTiming = (localOrder as any).ifood_order_timing
+              || (localOrder.dd_scheduled_for ? "SCHEDULED" : "IMMEDIATE");
+
+            await runAutoIfoodFlow({
+              supabase,
+              accessToken,
+              merchantId,
+              tokenMerchantId,
+              ifoodOrderId,
+              localOrderId: localOrder.id,
+              deliveryType: localOrder.delivery_type,
+              orderTiming,
+              autoAccept,
+              currentStatus: localOrder.status,
+            });
+          } catch (perOrderErr) {
+            console.error(`[IFOOD_AUTO_FLOW] error order_id=${ifoodOrderId} exception=${(perOrderErr as Error).message}`);
+          }
+        }
+      } catch (outerErr) {
+        console.error(`[IFOOD_AUTO_FLOW] error outer exception=${(outerErr as Error).message}`);
+      }
+    }
+
     // Acknowledge events
     if (eventIds.length > 0) {
       try {
