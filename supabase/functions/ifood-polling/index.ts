@@ -810,35 +810,34 @@ Deno.serve(async (req) => {
                   console.error("[ifood-polling] Error inserting extras:", extrasError);
                 } else {
                   console.log(`[ifood-polling]   ✓ ${extrasToInsert.length} extras inserted for item ${insertedItem.id}`);
+                }
               }
             }
-          }
 
-          // ── Auto-flow: confirm → startPreparation → readyToPickup → dispatch ──
-          // Triggered when restaurant has auto_accept_orders = true, and the order is
-          // an IMMEDIATE iFood DELIVERY (not scheduled, not pickup/takeout).
-          try {
-            const { data: rest } = await supabase
-              .from("restaurants")
-              .select("auto_accept_orders")
-              .eq("id", restaurant_id)
-              .maybeSingle();
-            const autoAccept = !!rest?.auto_accept_orders;
-            await runAutoIfoodFlow({
-              supabase,
-              accessToken,
-              merchantId,
-              tokenMerchantId,
-              ifoodOrderId: orderId,
-              localOrderId: insertedOrder.id,
-              deliveryType: deliveryTypeValue as "delivery" | "pickup",
-              isScheduled,
-              autoAccept,
-            });
-          } catch (autoFlowErr) {
-            console.error("[IFOOD_AUTO_FLOW] outer error:", autoFlowErr);
-          }
-        }
+            // ── Auto-flow: confirm → startPreparation → readyToPickup → dispatch ──
+            // Triggered when restaurant has auto_accept_orders = true, and the order is
+            // an IMMEDIATE iFood DELIVERY (not scheduled, not pickup/takeout).
+            try {
+              const { data: rest } = await supabase
+                .from("restaurants")
+                .select("auto_accept_orders")
+                .eq("id", restaurant_id)
+                .maybeSingle();
+              const autoAccept = !!rest?.auto_accept_orders;
+              await runAutoIfoodFlow({
+                supabase,
+                accessToken,
+                merchantId,
+                tokenMerchantId,
+                ifoodOrderId: orderId,
+                localOrderId: insertedOrder.id,
+                deliveryType: deliveryTypeValue as "delivery" | "pickup",
+                isScheduled,
+                autoAccept,
+              });
+            } catch (autoFlowErr) {
+              console.error("[IFOOD_AUTO_FLOW] outer error:", autoFlowErr);
+            }
           }
         } catch (e) {
           console.error("Error processing iFood order:", e);
