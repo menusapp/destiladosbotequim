@@ -46,6 +46,97 @@ function extractMerchantIdFromToken(accessToken?: string | null): string | null 
   }
 }
 
+/**
+ * Auto-execute the full iFood Order API transition chain for IMMEDIATE DELIVERY orders
+ * when the restaurant has auto_accept_orders enabled.
+ * Sequence: confirm → startPreparation → readyToPickup → dispatch
+ * Each step is logged via [IFOOD_AUDIT] with merchant_id, order_id, action, endpoint, status, timestamp.
+ */
+async function runAutoIfoodFlow(params: {
+  supabase: any;
+  accessToken: string;
+  merchantId: string | null;
+  tokenMerchantId: string | null;
+  ifoodOrderId: string;
+  localOrderId: string;
+  deliveryType: "delivery" | "pickup";
+  isScheduled: boolean;
+  autoAccept: boolean;
+}): Promise<void> {
+  const { supabase, accessToken, merchantId, tokenMerchantId, ifoodOrderId, localOrderId, deliveryType, isScheduled, autoAccept } = params;
+
+  if (!autoAccept) {
+    console.log(`[IFOOD_AUTO_FLOW] skip order_id=${ifoodOrderId} reason=auto_accept_disabled`);
+    return;
+  }
+  if (isScheduled) {
+    console.log(`[IFOOD_AUTO_FLOW] skip order_id=${ifoodOrderId} reason=scheduled_order`);
+    return;
+  }
+  if (deliveryType !== "delivery") {
+    console.log(`[IFOOD_AUTO_FLOW] skip order_id=${ifoodOrderId} reason=not_delivery (delivery_type=${deliveryType})`);
+    return;
+  }
+
+  console.log(`[IFOOD_AUTO_FLOW] start order_id=${ifoodOrderId} delivery_type=${deliveryType}`);
+
+  const steps: Array<{ action: string; path: string; localStatus: string; body?: Record<string, unknown> }> = [
+    { action: "confirm",           path: "confirm",         localStatus: "accepted" },
+    { action: "start_preparation", path: "startPreparation", localStatus: "preparing" },
+    { action: "ready_to_pickup",   path: "readyToPickup",   localStatus: "ready" },
+    { action: "dispatch",          path: "dispatch",        localStatus: "out_for_delivery", body: { deliveredBy: "MERCHANT" } },
+  ];
+
+  for (const step of steps) {
+    const endpoint = `/order/v1.0/orders/${ifoodOrderId}/${step.path}`;
+    const url = `${IFOOD_API}${endpoint}`;
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: step.body ? JSON.stringify(step.body) : undefined,
+      });
+      const text = await res.text();
+      auditLog({
+        merchantId,
+        tokenMerchantId,
+        orderId: ifoodOrderId,
+        action: step.action,
+        endpoint,
+        status: res.status,
+        response: text || null,
+      });
+      if (!res.ok) {
+        console.error(`[IFOOD_AUTO_FLOW] abort order_id=${ifoodOrderId} action=${step.action} status=${res.status}`);
+        return;
+      }
+      await supabase
+        .from("orders")
+        .update({ status: step.localStatus })
+        .eq("id", localOrderId);
+      // tiny delay between calls to respect iFood rate limits and event ordering
+      await new Promise((r) => setTimeout(r, 400));
+    } catch (e) {
+      auditLog({
+        merchantId,
+        tokenMerchantId,
+        orderId: ifoodOrderId,
+        action: step.action,
+        endpoint,
+        status: null,
+        response: { error: (e as Error).message },
+      });
+      console.error(`[IFOOD_AUTO_FLOW] exception order_id=${ifoodOrderId} action=${step.action}:`, e);
+      return;
+    }
+  }
+
+  console.log(`[IFOOD_AUTO_FLOW] complete order_id=${ifoodOrderId}`);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
