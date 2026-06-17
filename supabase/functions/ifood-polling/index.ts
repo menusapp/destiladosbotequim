@@ -905,6 +905,7 @@ Deno.serve(async (req) => {
           .eq("id", restaurant_id)
           .maybeSingle();
         const autoAccept = !!rest?.auto_accept_orders;
+        const homologationMode = !!(config as any)?.homologation_mode;
 
         for (const ifoodOrderId of touchedIfoodOrderIds) {
           try {
@@ -933,6 +934,7 @@ Deno.serve(async (req) => {
               deliveryType: localOrder.delivery_type,
               orderTiming,
               autoAccept,
+              homologationMode,
               currentStatus: localOrder.status,
             });
           } catch (perOrderErr) {
@@ -943,6 +945,7 @@ Deno.serve(async (req) => {
         console.error(`[IFOOD_AUTO_FLOW] error outer exception=${(outerErr as Error).message}`);
       }
     }
+
 
     // Acknowledge events
     if (eventIds.length > 0) {
