@@ -221,18 +221,25 @@ export function useOrderStatusAdvance(restaurantId: string) {
   };
 
   const syncIfoodStatus = async (order: Order, newStatus: string, reason?: string, cancellationCode?: string) => {
-    if (!order.ifood_source || !order.ifood_order_id) return;
+    console.log(`[IFOOD_DEBUG] syncIfoodStatus entry order_id=${order.id} current_status=${order.status} next_status=${newStatus} ifood_source=${!!order.ifood_source} ifood_order_id=${order.ifood_order_id ?? "null"} delivery_type=${order.delivery_type ?? "null"} order_type=${order.order_type ?? "null"}`);
+    if (!order.ifood_source || !order.ifood_order_id) {
+      console.warn(`[IFOOD_DEBUG] SKIPPED order_id=${order.id} reason=not_ifood_or_missing_order_id ifood_source=${!!order.ifood_source} ifood_order_id=${order.ifood_order_id ?? "null"}`);
+      return;
+    }
     const statusToAction: Record<string, string> = {
       accepted: "confirm", preparing: "start_preparation", ready: "ready_to_pickup",
       out_for_delivery: "dispatch", cancelled: "cancel",
     };
     const ifoodAction = statusToAction[newStatus];
-    if (!ifoodAction) return;
-    console.log("[iFood][action] dispatch", { orderId: order.id, ifoodOrderId: order.ifood_order_id, action: ifoodAction, cancellationCode, reason });
+    if (!ifoodAction) {
+      console.warn(`[IFOOD_DEBUG] SKIPPED order_id=${order.id} reason=no_action_mapping next_status=${newStatus}`);
+      return;
+    }
+    console.log(`[IFOOD_DEBUG] order_id=${order.id} current_status=${order.status} next_status=${newStatus} action=${ifoodAction} invoking_ifood_order_action=true`);
     const { data, error } = await supabase.functions.invoke("ifood-order-action", {
       body: { restaurant_id: restaurantId, ifood_order_id: order.ifood_order_id, order_id: order.id, action: ifoodAction, cancellation_code: cancellationCode, reason },
     });
-    console.log("[iFood][action] response", { data, error });
+    console.log(`[IFOOD_DEBUG] response order_id=${order.id} action=${ifoodAction} data=${JSON.stringify(data)} error=${error ? JSON.stringify(error) : "null"}`);
     if (error) {
       console.error("iFood action error:", error);
       toast.error("Erro ao sincronizar com iFood, mas o status local será atualizado");
@@ -248,7 +255,9 @@ export function useOrderStatusAdvance(restaurantId: string) {
   };
 
   const advanceStatus = async (order: Order, newStatus: string, reason?: string, cancellationCode?: string): Promise<boolean> => {
+    console.log(`[IFOOD_DEBUG] advanceStatus called order_id=${order.id} current_status=${order.status} next_status=${newStatus} ifood_source=${!!order.ifood_source} ifood_order_id=${order.ifood_order_id ?? "null"} payment_type=${order.payment_type ?? "null"}`);
     if (requiresPaymentForFinalization(order, newStatus) && (!order.payment_type || order.payment_type === "pending")) {
+      console.warn(`[IFOOD_DEBUG] BLOCKED order_id=${order.id} reason=requires_payment next_status=${newStatus} payment_type=${order.payment_type ?? "null"}`);
       toast.error("Defina a forma de pagamento antes de finalizar o pedido");
       return false;
     }
