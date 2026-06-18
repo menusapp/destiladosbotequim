@@ -255,7 +255,9 @@ export function useOrderStatusAdvance(restaurantId: string) {
   };
 
   const advanceStatus = async (order: Order, newStatus: string, reason?: string, cancellationCode?: string): Promise<boolean> => {
+    console.log(`[IFOOD_DEBUG] advanceStatus called order_id=${order.id} current_status=${order.status} next_status=${newStatus} ifood_source=${!!order.ifood_source} ifood_order_id=${order.ifood_order_id ?? "null"} payment_type=${order.payment_type ?? "null"}`);
     if (requiresPaymentForFinalization(order, newStatus) && (!order.payment_type || order.payment_type === "pending")) {
+      console.warn(`[IFOOD_DEBUG] BLOCKED order_id=${order.id} reason=requires_payment next_status=${newStatus} payment_type=${order.payment_type ?? "null"}`);
       toast.error("Defina a forma de pagamento antes de finalizar o pedido");
       return false;
     }
