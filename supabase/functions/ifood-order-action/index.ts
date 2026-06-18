@@ -62,7 +62,10 @@ Deno.serve(async (req) => {
 
     const { restaurant_id, ifood_order_id, order_id, action, cancellation_code, reason } = await req.json();
 
+    console.log(`[IFOOD_DEBUG] edge_invoked restaurant_id=${restaurant_id ?? "null"} ifood_order_id=${ifood_order_id ?? "null"} order_id=${order_id ?? "null"} action=${action ?? "null"} timestamp=${new Date().toISOString()}`);
+
     if (!restaurant_id || !ifood_order_id || !action) {
+      console.warn(`[IFOOD_DEBUG] edge_bad_request missing fields restaurant_id=${!!restaurant_id} ifood_order_id=${!!ifood_order_id} action=${!!action}`);
       return new Response(
         JSON.stringify({ error: "restaurant_id, ifood_order_id and action are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
