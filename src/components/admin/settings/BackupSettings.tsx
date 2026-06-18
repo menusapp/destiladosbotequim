@@ -349,13 +349,8 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
 
   const handleDownloadCloudBackup = async (fileName: string) => {
     try {
-      const { data, error } = await supabase.storage
-        .from("backups")
-        .download(`${restaurantId}/${fileName}`);
-
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
+      const blob = await storageDownload("backups", `${restaurantId}/${fileName}`);
+      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `cloud_backup_${fileName}`;
