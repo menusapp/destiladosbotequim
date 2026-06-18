@@ -335,11 +335,7 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
       const fileName = `${format(new Date(), "yyyy-MM-dd_HH-mm")}.json`;
       const blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
 
-      const { error } = await supabase.storage
-        .from("backups")
-        .upload(`${restaurantId}/${fileName}`, blob, { upsert: true });
-
-      if (error) throw error;
+      await storageUpload("backups", `${restaurantId}/${fileName}`, blob, "application/json");
 
       toast.success("Backup em cloud salvo com sucesso!");
       fetchCloudBackups();
