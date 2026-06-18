@@ -220,7 +220,11 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
       }
 
       // 2. Remove certificate from storage
-      await supabase.storage.from("fiscal-certificates").remove([`${restaurantId}/certificate.pfx`]);
+      try {
+        await storageDelete("fiscal-certificates", [`${restaurantId}/certificate.pfx`]);
+      } catch (e) {
+        console.error("Failed to remove certificate:", e);
+      }
 
       // 3. Clear local config
       const { error } = await supabase
