@@ -860,24 +860,28 @@ Deno.serve(async (req) => {
           console.error("Error processing iFood order:", e);
         }
       } else if (eventCode === "CONFIRMED") {
+        if ((config as any)?.homologation_mode) continue;
         await supabase
           .from("orders")
           .update({ status: "accepted" })
           .eq("ifood_order_id", orderId)
           .eq("restaurant_id", restaurant_id);
       } else if (eventCode === "READY_TO_PICKUP" || eventCode === "RTP") {
+        if ((config as any)?.homologation_mode) continue;
         await supabase
           .from("orders")
           .update({ status: "ready" })
           .eq("ifood_order_id", orderId)
           .eq("restaurant_id", restaurant_id);
       } else if (eventCode === "DISPATCHED" || eventCode === "DSP") {
+        if ((config as any)?.homologation_mode) continue;
         await supabase
           .from("orders")
           .update({ status: "out_for_delivery" })
           .eq("ifood_order_id", orderId)
           .eq("restaurant_id", restaurant_id);
       } else if (eventCode === "CANCELLED" || eventCode === "CANCELLATION_REQUESTED" || eventCode === "CAN") {
+        if ((config as any)?.homologation_mode) continue;
         const cancelReason =
           event.metadata?.cancellationReason ||
           event.metadata?.reason ||
@@ -889,6 +893,7 @@ Deno.serve(async (req) => {
           .eq("ifood_order_id", orderId)
           .eq("restaurant_id", restaurant_id);
       } else if (eventCode === "CONCLUDED" || eventCode === "CONCLUSION" || eventCode === "CON") {
+        if ((config as any)?.homologation_mode) continue;
         await supabase
           .from("orders")
           .update({ status: "delivered" })
