@@ -47,9 +47,11 @@ function extractMerchantIdFromToken(accessToken?: string | null): string | null 
 }
 
 /**
- * Auto-execute the full iFood Order API transition chain for IMMEDIATE DELIVERY orders
+ * Auto-execute the operational iFood Order API transition chain for IMMEDIATE DELIVERY orders
  * when the restaurant has auto_accept_orders enabled.
- * Sequence: confirm → startPreparation → readyToPickup → dispatch
+ * In homologation mode this is intentionally disabled so the Firefly/manual Kanban
+ * certification flow is the only path that calls ifood-order-action/order endpoints.
+ * Operational sequence: confirm → startPreparation
  * Idempotent: skips steps already reflected in the local order status, so it can be
  * safely invoked multiple times per polling cycle / per inbound event.
  */
@@ -77,6 +79,10 @@ async function runAutoIfoodFlow(params: {
   const baseCtx = `order_id=${ifoodOrderId} local_order_id=${localOrderId} current_status=${currentStatus ?? "null"} delivery_type=${deliveryType ?? "null"} order_timing=${orderTiming ?? "null"} auto_accept_orders=${autoAccept} homologation_mode=${homologationMode}`;
 
 
+  if (homologationMode) {
+    console.log(`[IFOOD_AUTO_FLOW] skip ${baseCtx} reason=homologation_manual_mode`);
+    return;
+  }
   if (!autoAccept) {
     console.log(`[IFOOD_AUTO_FLOW] skip ${baseCtx} reason=auto_accept_disabled`);
     return;
@@ -96,17 +102,15 @@ async function runAutoIfoodFlow(params: {
 
   console.log(`[IFOOD_AUTO_FLOW] start ${baseCtx}`);
 
-  // OPERATIONAL MODE (default): only confirm + startPreparation. The operator
-  // manually advances ready → dispatch from the admin panel.
-  // HOMOLOGATION MODE: full chain confirm → startPreparation → readyToPickup → dispatch
-  // for iFood certification scenarios only.
+  // OPERATIONAL MODE: only confirm + startPreparation. The operator manually
+  // advances ready → dispatch from the admin panel.
   const allSteps: Array<{ action: string; path: string; localStatus: LocalStatus; body?: Record<string, unknown> }> = [
     { action: "confirm",           path: "confirm",         localStatus: "accepted" },
     { action: "start_preparation", path: "startPreparation", localStatus: "preparing" },
     { action: "ready_to_pickup",   path: "readyToPickup",   localStatus: "ready" },
     { action: "dispatch",          path: "dispatch",        localStatus: "out_for_delivery", body: { deliveredBy: "MERCHANT" } },
   ];
-  const steps = homologationMode ? allSteps : allSteps.slice(0, 2);
+  const steps = allSteps.slice(0, 2);
 
 
   const currentIdx = STEP_ORDER.indexOf((currentStatus ?? "pending") as LocalStatus);
@@ -856,24 +860,28 @@ Deno.serve(async (req) => {
           console.error("Error processing iFood order:", e);
         }
       } else if (eventCode === "CONFIRMED") {
+        if ((config as any)?.homologation_mode) continue;
         await supabase
           .from("orders")
           .update({ status: "accepted" })
           .eq("ifood_order_id", orderId)
           .eq("restaurant_id", restaurant_id);
       } else if (eventCode === "READY_TO_PICKUP" || eventCode === "RTP") {
+        if ((config as any)?.homologation_mode) continue;
         await supabase
           .from("orders")
           .update({ status: "ready" })
           .eq("ifood_order_id", orderId)
           .eq("restaurant_id", restaurant_id);
       } else if (eventCode === "DISPATCHED" || eventCode === "DSP") {
+        if ((config as any)?.homologation_mode) continue;
         await supabase
           .from("orders")
           .update({ status: "out_for_delivery" })
           .eq("ifood_order_id", orderId)
           .eq("restaurant_id", restaurant_id);
       } else if (eventCode === "CANCELLED" || eventCode === "CANCELLATION_REQUESTED" || eventCode === "CAN") {
+        if ((config as any)?.homologation_mode) continue;
         const cancelReason =
           event.metadata?.cancellationReason ||
           event.metadata?.reason ||
@@ -885,6 +893,7 @@ Deno.serve(async (req) => {
           .eq("ifood_order_id", orderId)
           .eq("restaurant_id", restaurant_id);
       } else if (eventCode === "CONCLUDED" || eventCode === "CONCLUSION" || eventCode === "CON") {
+        if ((config as any)?.homologation_mode) continue;
         await supabase
           .from("orders")
           .update({ status: "delivered" })
