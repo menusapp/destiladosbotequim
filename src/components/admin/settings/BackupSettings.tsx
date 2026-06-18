@@ -122,15 +122,12 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
   const fetchCloudBackups = async () => {
     setLoadingCloud(true);
     try {
-      const { data, error } = await supabase.storage
-        .from("backups")
-        .list(`${restaurantId}`, { limit: 7, sortBy: { column: "created_at", order: "desc" } });
-      if (!error && data) {
-        setCloudBackups(data.filter(f => f.name.endsWith(".json")).map(f => ({
-          name: f.name,
-          created_at: f.created_at || "",
-        })));
-      }
+      const items = await storageList("backups", `${restaurantId}`, 7);
+      setCloudBackups(
+        items
+          .filter((f) => f.name.endsWith(".json"))
+          .map((f) => ({ name: f.name, created_at: f.created_at || "" })),
+      );
     } catch (err) {
       console.error("Error fetching cloud backups:", err);
     } finally {
