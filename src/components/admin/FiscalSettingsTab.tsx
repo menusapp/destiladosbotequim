@@ -149,10 +149,7 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
 
       if (selectedFile) {
         const filePath = `${restaurantId}/certificate.pfx`;
-        const { error: uploadError } = await supabase.storage
-          .from("fiscal-certificates")
-          .upload(filePath, selectedFile, { upsert: true });
-        if (uploadError) throw uploadError;
+        await storageUpload("fiscal-certificates", filePath, selectedFile, selectedFile.type || "application/x-pkcs12");
         certificatePath = filePath;
         toast.success("Certificado enviado com sucesso");
       }
