@@ -1,0 +1,1 @@
+UPDATE public.restaurants SET auto_accept_orders = false WHERE id = '8947a1f1-eaee-4f15-90eb-dad7c2a0339a'; UPDATE public.ifood_config SET homologation_mode = true WHERE restaurant_id = '8947a1f1-eaee-4f15-90eb-dad7c2a0339a';
