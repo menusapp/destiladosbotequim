@@ -165,7 +165,9 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
     const previousStatus = order.status;
     setOrder(prev => ({ ...prev, status: newStatus, ...(newStatus === "cancelled" && reason ? { cancellation_reason: reason } : {}) }));
 
+    console.log(`[IFOOD_DEBUG] button_clicked source=order_detail_modal order_id=${order.id} current_status=${previousStatus} next_status=${newStatus} ifood_source=${!!(order as any).ifood_source} ifood_order_id=${(order as any).ifood_order_id ?? "null"} order_type=${(order as any).order_type ?? "null"} delivery_type=${(order as any).delivery_type ?? "null"} payment_type=${(order as any).payment_type ?? "null"} reason=${reason ?? "null"} cancellation_code=${cancellationCode ?? "null"}`);
     const success = await advanceStatus(order, newStatus, reason, cancellationCode);
+    console.log(`[IFOOD_DEBUG] button_result source=order_detail_modal order_id=${order.id} success=${success}`);
     if (success) {
       onStatusUpdate();
       onClose();
@@ -173,6 +175,7 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
       setOrder(prev => ({ ...prev, status: previousStatus }));
     }
   };
+
 
   const openCancelDialog = async () => {
     setShowCancelDialog(true);
