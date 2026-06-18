@@ -391,11 +391,17 @@ const UnifiedOrdersTab = ({ restaurantId, pendingOrderToOpen, onOrderOpened, sho
 
   const handleQuickAdvance = async (e: React.MouseEvent, order: Order) => {
     e.stopPropagation();
-    const next = getNextStatus(order);
-    if (!next) return;
-    const success = await advanceStatus(order, next.status);
+    const next = getNextStatus(order as any);
+    console.log(`[IFOOD_DEBUG] button_clicked source=kanban_quick_advance order_id=${order.id} current_status=${order.status} next_status=${next?.status ?? "null"} ifood_source=${!!(order as any).ifood_source} ifood_order_id=${(order as any).ifood_order_id ?? "null"} order_type=${(order as any).order_type ?? "null"} delivery_type=${(order as any).delivery_type ?? "null"} payment_type=${(order as any).payment_type ?? "null"}`);
+    if (!next) {
+      console.warn(`[IFOOD_DEBUG] button_aborted order_id=${order.id} reason=no_next_status current_status=${order.status}`);
+      return;
+    }
+    const success = await advanceStatus(order as any, next.status);
+    console.log(`[IFOOD_DEBUG] button_result source=kanban_quick_advance order_id=${order.id} success=${success}`);
     if (success) fetchOrders();
   };
+
 
   const handleQuickPrint = async (e: React.MouseEvent, order: Order) => {
     e.stopPropagation();
