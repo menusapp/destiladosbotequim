@@ -101,3 +101,6 @@ verify_jwt = false
 
 [functions.staff-create]
 verify_jwt = false
+
+[functions.restaurant-storage-ops]
+verify_jwt = false
