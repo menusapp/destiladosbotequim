@@ -1,5 +1,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  listObjects as storageList,
+  uploadObject as storageUpload,
+  downloadObject as storageDownload,
+} from "@/lib/restaurantStorage";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -117,15 +122,12 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
   const fetchCloudBackups = async () => {
     setLoadingCloud(true);
     try {
-      const { data, error } = await supabase.storage
-        .from("backups")
-        .list(`${restaurantId}`, { limit: 7, sortBy: { column: "created_at", order: "desc" } });
-      if (!error && data) {
-        setCloudBackups(data.filter(f => f.name.endsWith(".json")).map(f => ({
-          name: f.name,
-          created_at: f.created_at || "",
-        })));
-      }
+      const items = await storageList("backups", `${restaurantId}`, 7);
+      setCloudBackups(
+        items
+          .filter((f) => f.name.endsWith(".json"))
+          .map((f) => ({ name: f.name, created_at: f.created_at || "" })),
+      );
     } catch (err) {
       console.error("Error fetching cloud backups:", err);
     } finally {
@@ -333,11 +335,7 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
       const fileName = `${format(new Date(), "yyyy-MM-dd_HH-mm")}.json`;
       const blob = new Blob([JSON.stringify(backup)], { type: "application/json" });
 
-      const { error } = await supabase.storage
-        .from("backups")
-        .upload(`${restaurantId}/${fileName}`, blob, { upsert: true });
-
-      if (error) throw error;
+      await storageUpload("backups", `${restaurantId}/${fileName}`, blob, "application/json");
 
       toast.success("Backup em cloud salvo com sucesso!");
       fetchCloudBackups();
@@ -351,13 +349,8 @@ export default function BackupSettings({ restaurantId }: BackupSettingsProps) {
 
   const handleDownloadCloudBackup = async (fileName: string) => {
     try {
-      const { data, error } = await supabase.storage
-        .from("backups")
-        .download(`${restaurantId}/${fileName}`);
-
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
+      const blob = await storageDownload("backups", `${restaurantId}/${fileName}`);
+      const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `cloud_backup_${fileName}`;

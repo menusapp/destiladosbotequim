@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadObject as storageUpload, deleteObjects as storageDelete } from "@/lib/restaurantStorage";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -148,10 +149,7 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
 
       if (selectedFile) {
         const filePath = `${restaurantId}/certificate.pfx`;
-        const { error: uploadError } = await supabase.storage
-          .from("fiscal-certificates")
-          .upload(filePath, selectedFile, { upsert: true });
-        if (uploadError) throw uploadError;
+        await storageUpload("fiscal-certificates", filePath, selectedFile, selectedFile.type || "application/x-pkcs12");
         certificatePath = filePath;
         toast.success("Certificado enviado com sucesso");
       }
@@ -222,7 +220,11 @@ export default function FiscalSettingsTab({ restaurantId }: FiscalSettingsTabPro
       }
 
       // 2. Remove certificate from storage
-      await supabase.storage.from("fiscal-certificates").remove([`${restaurantId}/certificate.pfx`]);
+      try {
+        await storageDelete("fiscal-certificates", [`${restaurantId}/certificate.pfx`]);
+      } catch (e) {
+        console.error("Failed to remove certificate:", e);
+      }
 
       // 3. Clear local config
       const { error } = await supabase
