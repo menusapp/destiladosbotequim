@@ -219,26 +219,54 @@ export function useOrderStatusAdvance(restaurantId: string) {
   const syncIfoodStatus = async (order: Order, newStatus: string, reason?: string, cancellationCode?: string) => {
     console.log(`[IFOOD_DEBUG] syncIfoodStatus entry order_id=${order.id} current_status=${order.status} next_status=${newStatus} ifood_source=${!!order.ifood_source} ifood_order_id=${order.ifood_order_id ?? "null"} delivery_type=${order.delivery_type ?? "null"} order_type=${order.order_type ?? "null"}`);
     if (!order.ifood_source || !order.ifood_order_id) {
-      console.warn(`[IFOOD_DEBUG] SKIPPED order_id=${order.id} reason=not_ifood_or_missing_order_id ifood_source=${!!order.ifood_source} ifood_order_id=${order.ifood_order_id ?? "null"}`);
+      console.warn(`[IFOOD_DEBUG] SKIPPED order_id=${order.id} reason=not_ifood_or_missing_order_id`);
       return;
     }
-    const statusToAction: Record<string, string> = {
-      accepted: "confirm", preparing: "start_preparation", ready: "ready_to_pickup",
-      out_for_delivery: "dispatch", cancelled: "cancel",
-    };
-    const ifoodAction = statusToAction[newStatus];
-    if (!ifoodAction) {
-      console.warn(`[IFOOD_DEBUG] SKIPPED order_id=${order.id} reason=no_action_mapping next_status=${newStatus}`);
+
+    // Compose iFood action sequence based on (current_status, new_status, delivery_type).
+    // Cada clique no Kanban iFood pode disparar múltiplos endpoints sequenciais.
+    const isDelivery = order.delivery_type === "delivery";
+    const cur = order.status;
+    let actions: string[] = [];
+
+    if (newStatus === "cancelled") {
+      actions = ["cancel"];
+    } else if (cur === "pending" && newStatus === "preparing") {
+      // Confirmar: confirm + startPreparation
+      actions = ["confirm", "start_preparation"];
+    } else if (cur === "preparing" && newStatus === "out_for_delivery" && isDelivery) {
+      // Pronto (delivery): readyToPickup + dispatch
+      actions = ["ready_to_pickup", "dispatch"];
+    } else if (cur === "preparing" && newStatus === "ready") {
+      // Pronto (pickup/takeaway): readyToPickup
+      actions = ["ready_to_pickup"];
+    } else if (newStatus === "delivered" || newStatus === "picked_up") {
+      // Entregue / Retirado: apenas local, sem endpoint iFood
+      actions = [];
+    } else {
+      // Fallback (transições legadas) — manter mapeamento 1:1 para compatibilidade.
+      const legacy: Record<string, string> = {
+        accepted: "confirm", preparing: "start_preparation",
+        ready: "ready_to_pickup", out_for_delivery: "dispatch",
+      };
+      if (legacy[newStatus]) actions = [legacy[newStatus]];
+    }
+
+    if (actions.length === 0) {
+      console.log(`[IFOOD_DEBUG] no iFood endpoint for transition order_id=${order.id} ${cur}->${newStatus}`);
       return;
     }
-    console.log(`[IFOOD_DEBUG] order_id=${order.id} current_status=${order.status} next_status=${newStatus} action=${ifoodAction} invoking_ifood_order_action=true`);
-    const { data, error } = await supabase.functions.invoke("ifood-order-action", {
-      body: { restaurant_id: restaurantId, ifood_order_id: order.ifood_order_id, order_id: order.id, action: ifoodAction, cancellation_code: cancellationCode, reason },
-    });
-    console.log(`[IFOOD_DEBUG] response order_id=${order.id} action=${ifoodAction} data=${JSON.stringify(data)} error=${error ? JSON.stringify(error) : "null"}`);
-    if (error) {
-      console.error("iFood action error:", error);
-      toast.error("Erro ao sincronizar com iFood, mas o status local será atualizado");
+
+    for (const ifoodAction of actions) {
+      console.log(`[IFOOD_DEBUG] order_id=${order.id} ${cur}->${newStatus} action=${ifoodAction} invoking_ifood_order_action=true`);
+      const { data, error } = await supabase.functions.invoke("ifood-order-action", {
+        body: { restaurant_id: restaurantId, ifood_order_id: order.ifood_order_id, order_id: order.id, action: ifoodAction, cancellation_code: cancellationCode, reason },
+      });
+      console.log(`[IFOOD_DEBUG] response order_id=${order.id} action=${ifoodAction} data=${JSON.stringify(data)} error=${error ? JSON.stringify(error) : "null"}`);
+      if (error) {
+        console.error(`iFood action error (${ifoodAction}):`, error);
+        toast.error(`Erro ao sincronizar com iFood (${ifoodAction}), mas o status local será atualizado`);
+      }
     }
   };
 
