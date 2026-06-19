@@ -53,13 +53,10 @@ export function getNextStatus(order: Order): NextStatusResult | null {
 
   switch (order.status) {
     case "pending":
+      // iFood: Confirmar = confirm + startPreparation → move direto p/ "Preparando"
+      if (isIfood) return { status: "preparing", label: "Confirmar" };
       return { status: "accepted", label: "Confirmar" };
     case "accepted":
-      // iFood requires explicit startPreparation transition before readyToPickup/dispatch.
-      if (isIfood && (isDelivery || isPickup || isTakeaway)) {
-        return { status: "preparing", label: "Iniciar Preparo" };
-      }
-      // fallthrough to legacy behavior
       if (isDelivery) return { status: "out_for_delivery", label: "Saiu p/ Entrega" };
       if (isPickup) return { status: "out_for_delivery", label: "Pronto p/ Retirada" };
       if (isTakeaway) return { status: "picked_up", label: "Retirado" };
@@ -67,10 +64,10 @@ export function getNextStatus(order: Order): NextStatusResult | null {
       if (isLocal) return { status: "delivered", label: "Na Mesa" };
       return { status: "preparing", label: "Em Preparo" };
     case "preparing":
-      // iFood: preparing -> ready (readyToPickup) for all delivery_types
-      if (isIfood && (isDelivery || isPickup || isTakeaway)) {
-        return { status: "ready", label: isDelivery ? "Pronto" : "Pronto p/ Retirada" };
-      }
+      // iFood DELIVERY: Pronto = readyToPickup + dispatch → move direto p/ "Saiu p/ Entrega"
+      if (isIfood && isDelivery) return { status: "out_for_delivery", label: "Pronto" };
+      // iFood PICKUP/TAKEAWAY: Pronto = readyToPickup
+      if (isIfood && (isPickup || isTakeaway)) return { status: "ready", label: "Pronto p/ Retirada" };
       if (isDelivery) return { status: "out_for_delivery", label: "Saiu p/ Entrega" };
       if (isPickup) return { status: "out_for_delivery", label: "Pronto p/ Retirada" };
       if (isTakeaway) return { status: "picked_up", label: "Retirado" };
@@ -78,14 +75,13 @@ export function getNextStatus(order: Order): NextStatusResult | null {
       if (isLocal) return { status: "delivered", label: "Na Mesa" };
       return { status: "ready", label: "Pronto" };
     case "ready":
-      // iFood DELIVERY: ready -> out_for_delivery (dispatch)
-      if (isIfood && isDelivery) return { status: "out_for_delivery", label: "Despachar" };
       // iFood TAKEOUT/PICKUP: encerra em ready (sem dispatch)
       if (isIfood && (isPickup || isTakeaway)) return null;
       if (isBalcao) return { status: "picked_up", label: "Retirado" };
       if (isLocal) return { status: "delivered", label: "Na Mesa" };
       return null;
     case "out_for_delivery":
+      // iFood DELIVERY: Entregue = apenas local (sem endpoint iFood)
       if (isDelivery) return { status: "delivered", label: "Entregue" };
       if (isPickup) return { status: "picked_up", label: "Retirado" };
       return null;
