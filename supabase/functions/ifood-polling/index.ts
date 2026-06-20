@@ -952,6 +952,10 @@ Deno.serve(async (req) => {
           .eq("ifood_order_id", orderId)
           .eq("restaurant_id", restaurant_id);
       }
+      } catch (perEventErr) {
+        // Processing failed AFTER the ACK was already sent — log and continue.
+        console.error(`[IFOOD_EVENT] processing error event_id=${event.id} full_code=${eventCode} order_id=${orderId ?? "null"} exception=${(perEventErr as Error).message}`);
+      }
     }
 
     // ── Post-loop AUTO-FLOW pass ─────────────────────────────────────────
