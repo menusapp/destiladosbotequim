@@ -381,14 +381,60 @@ Deno.serve(async (req) => {
 
     let newOrdersCount = 0;
     const eventIds: { id: string }[] = [];
+    const ackedEventIds = new Set<string>();
     const touchedIfoodOrderIds = new Set<string>();
 
+    // Per-event immediate ACK helper.
+    // Sends POST /events/v1.0/events/acknowledgment with body `[{"id":"<event_id>"}]`
+    // BEFORE any business-logic processing, so a downstream exception cannot
+    // prevent the ACK. Emits a single line with all Firefly-audit fields.
+    const ackSingleEvent = async (ev: any, timestampRecebimento: string) => {
+      if (!ev?.id || ackedEventIds.has(ev.id)) return;
+      const ackEndpoint = `/events/v1.0/events/acknowledgment`;
+      const ackUrl = `${IFOOD_API}${ackEndpoint}`;
+      const ackPayloadArr = [{ id: ev.id }];
+      const ackPayload = JSON.stringify(ackPayloadArr);
+      let ackStatus: number | null = null;
+      let ackText = "";
+      let timestampAck = "";
+      try {
+        const ackRes = await fetch(ackUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: ackPayload,
+        });
+        ackStatus = ackRes.status;
+        ackText = await ackRes.text();
+        timestampAck = new Date().toISOString();
+        ackedEventIds.add(ev.id);
+        eventIds.push({ id: ev.id });
+      } catch (e) {
+        timestampAck = new Date().toISOString();
+        ackText = `EXCEPTION:${(e as Error).message}`;
+      }
+      console.log(
+        `[IFOOD_ACK] event_id=${ev.id} full_code=${ev.fullCode ?? "null"} code=${ev.code ?? "null"} order_id=${ev.orderId ?? "null"} merchant_id=${ev.merchantId ?? merchantId} token_merchant_id=${tokenMerchantId} timestamp_recebimento=${timestampRecebimento} timestamp_ack=${timestampAck} http_status=${ackStatus ?? "null"} payload_ack=${ackPayload} response_ack=${(ackText || "").slice(0, 1000)} url=${ackUrl}`
+      );
+      auditLog({
+        merchantId,
+        tokenMerchantId,
+        orderId: ev.orderId ?? null,
+        action: "acknowledgment",
+        endpoint: ackEndpoint,
+        status: ackStatus,
+        response: { event_id: ev.id, full_code: ev.fullCode ?? null, payload: ackPayloadArr, response: ackText || null, timestamp_recebimento: timestampRecebimento, timestamp_ack: timestampAck },
+      });
+    };
+
     for (const event of events) {
-      eventIds.push({ id: event.id });
+      const timestampRecebimento = new Date().toISOString();
       const eventCode = event.fullCode || event.code || "";
       const orderId = event.orderId;
       if (orderId) touchedIfoodOrderIds.add(orderId);
-      console.log("Evento recebido:", JSON.stringify({ id: event.id, code: event.code, fullCode: event.fullCode, orderId: event.orderId }));
+      console.log("Evento recebido:", JSON.stringify({ id: event.id, code: event.code, fullCode: event.fullCode, orderId: event.orderId, timestamp_recebimento: timestampRecebimento }));
       auditLog({
         merchantId,
         tokenMerchantId,
@@ -396,8 +442,14 @@ Deno.serve(async (req) => {
         action: `event_${eventCode || "unknown"}`,
         endpoint: pollingEndpoint,
         status: eventsRes.status,
-        response: { event_id: event.id, event_merchant_id: event.merchantId ?? null, created_at: event.createdAt ?? null },
+        response: { event_id: event.id, event_merchant_id: event.merchantId ?? null, created_at: event.createdAt ?? null, full_code: event.fullCode ?? null, timestamp_recebimento: timestampRecebimento },
       });
+
+      // ACK immediately — BEFORE any processing — so the ACK is never blocked
+      // by a downstream exception, and covers every code (PLC/CFM/PRS/RTP/DSP/CAN/CON/DDCR/...).
+      await ackSingleEvent(event, timestampRecebimento);
+
+      try {
 
       if (eventCode === "PLACED") {
         // Check if order already exists
