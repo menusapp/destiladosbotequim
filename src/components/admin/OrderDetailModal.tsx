@@ -192,7 +192,14 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
         if (error) throw error;
         if (data?.error) {
           console.warn("[iFood][cancel] iFood returned error", data);
-          toast.error(data.error);
+          const isAlreadyCancelled =
+            data.ifood_message?.toLowerCase().includes("already cancelled") ||
+            data.error?.toLowerCase().includes("already cancelled");
+          if (isAlreadyCancelled) {
+            toast.error("Este pedido já foi cancelado no iFood.");
+          } else {
+            toast.error(data.error);
+          }
           setIfoodReasons([]);
           return;
         }
