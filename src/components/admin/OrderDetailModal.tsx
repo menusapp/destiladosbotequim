@@ -190,6 +190,12 @@ export const OrderDetailModal = ({ order: initialOrder, restaurantId, onClose, o
           body: { restaurant_id: restaurantId, ifood_order_id: order.ifood_order_id, order_id: order.id, action: "get_cancellation_reasons" },
         });
         if (error) throw error;
+        if (data?.error) {
+          console.warn("[iFood][cancel] iFood returned error", data);
+          toast.error(data.error);
+          setIfoodReasons([]);
+          return;
+        }
         const reasons = Array.isArray(data?.reasons) ? data.reasons : [];
         console.log("[iFood][cancel] reasons received", { count: reasons.length, reasons });
         setIfoodReasons(reasons);
