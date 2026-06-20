@@ -1012,38 +1012,11 @@ Deno.serve(async (req) => {
     }
 
 
-    // Acknowledge events
-    if (eventIds.length > 0) {
-      try {
-        const ackEndpoint = `/events/v1.0/events/acknowledgment`;
-        const ackPayload = JSON.stringify(eventIds);
-        const ackUrl = `${IFOOD_API}${ackEndpoint}`;
-        console.log(`[IFOOD_ACK] sending count=${eventIds.length} merchant_id=${merchantId} token_merchant_id=${tokenMerchantId} url=${ackUrl} payload=${ackPayload}`);
-        const ackRes = await fetch(ackUrl, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: ackPayload,
-        });
-        const ackText = await ackRes.text();
-        for (const ev of events) {
-          console.log(`[IFOOD_ACK] event_id=${ev.id} order_id=${ev.orderId ?? "null"} code=${ev.code ?? "null"} full_code=${ev.fullCode ?? "null"} http_status=${ackRes.status} ack_response=${(ackText || "").slice(0, 500)}`);
-        }
-        auditLog({
-          merchantId,
-          tokenMerchantId,
-          orderId: null,
-          action: "acknowledgment",
-          endpoint: ackEndpoint,
-          status: ackRes.status,
-          response: ackText || { event_ids: eventIds },
-        });
-      } catch (e) {
-        console.error("[IFOOD_ACK] Failed to acknowledge events:", e);
-      }
-    }
+    // Per-event ACK is now performed immediately at the top of the event loop
+    // (see ackSingleEvent above). The previous batch ACK block was removed to
+    // guarantee SLA: ACK happens BEFORE any processing and cannot be skipped
+    // by downstream exceptions. eventIds contains only the events that were
+    // successfully ACK'd individually (kept for the response payload below).
 
     // Update last polling time
     await supabase
