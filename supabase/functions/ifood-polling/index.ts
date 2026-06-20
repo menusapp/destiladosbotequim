@@ -435,6 +435,9 @@ Deno.serve(async (req) => {
       const orderId = event.orderId;
       if (orderId) touchedIfoodOrderIds.add(orderId);
       console.log("Evento recebido:", JSON.stringify({ id: event.id, code: event.code, fullCode: event.fullCode, orderId: event.orderId, timestamp_recebimento: timestampRecebimento }));
+      console.log(
+        `[IFOOD_POLLING_EVENT] event_id=${event.id} full_code=${event.fullCode ?? "null"} code=${event.code ?? "null"} order_id=${event.orderId ?? "null"} merchant_id=${event.merchantId ?? merchantId} received_at=${timestampRecebimento} created_at=${event.createdAt ?? "null"}`
+      );
       auditLog({
         merchantId,
         tokenMerchantId,
