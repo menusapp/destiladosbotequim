@@ -133,6 +133,10 @@ Deno.serve(async (req) => {
       fetchOptions.body = JSON.stringify({ deliveredBy: "MERCHANT" });
     }
 
+    if (action === "get_cancellation_reasons") {
+      console.log(`[IFOOD_CANCEL_REASONS] request order_id=${ifood_order_id} merchant_id=${config.merchant_id} endpoint=${endpoint} url=${url}`);
+    }
+
     const response = await fetch(url, fetchOptions);
     const responseText = await response.text();
     auditLog({
@@ -146,9 +150,27 @@ Deno.serve(async (req) => {
     });
 
     if (action === "get_cancellation_reasons") {
+      console.log(`[IFOOD_CANCEL_REASONS] response status=${response.status} order_id=${ifood_order_id} merchant_id=${config.merchant_id}`);
+      console.log(`[IFOOD_CANCEL_REASONS] body=${responseText || "(empty)"}`);
+
       let parsed: any = null;
       try { parsed = responseText ? JSON.parse(responseText) : null; } catch (_) { parsed = null; }
-      const reasons = response.ok ? (Array.isArray(parsed) ? parsed : (parsed?.reasons || [])) : [];
+
+      if (!response.ok) {
+        const ifoodMessage = parsed?.message || parsed?.error || responseText || `HTTP ${response.status}`;
+        return new Response(
+          JSON.stringify({
+            reasons: [],
+            error: `Não foi possível obter os motivos de cancelamento: ${ifoodMessage}`,
+            ifood_status: response.status,
+            ifood_code: parsed?.code || null,
+            ifood_message: ifoodMessage,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const reasons = Array.isArray(parsed) ? parsed : (parsed?.reasons || []);
       return new Response(
         JSON.stringify({ reasons }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
