@@ -5054,6 +5054,7 @@ export type Database = {
         }
         Returns: string
       }
+      cron_ifood_polling_30s: { Args: never; Returns: undefined }
       deduct_stock_for_order_item: {
         Args: { p_order_item_id: string }
         Returns: undefined
@@ -5137,6 +5138,7 @@ export type Database = {
         Args: { p_order_item_id: string; p_restaurant_id: string }
         Returns: undefined
       }
+      trigger_ifood_polling_all: { Args: never; Returns: undefined }
       try_acquire_polling_lock: {
         Args: { _key: string; _owner?: string; _ttl_seconds?: number }
         Returns: boolean
