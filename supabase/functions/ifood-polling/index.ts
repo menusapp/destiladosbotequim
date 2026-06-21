@@ -227,7 +227,29 @@ Deno.serve(async (req) => {
       );
     }
 
+    // ============================================================
+    // DISTRIBUTED LOCK — garante execução única por merchant
+    // ============================================================
+    const lockKey = `ifood-polling:${merchantId}`;
+    const { data: lockAcquired, error: lockError } = await supabase.rpc(
+      "try_acquire_polling_lock",
+      { _key: lockKey, _ttl_seconds: 120, _owner: `restaurant:${restaurant_id}` }
+    );
+    if (lockError) {
+      console.error(`[IFOOD_POLLING] lock_rpc_error merchant_id=${merchantId} error=${lockError.message}`);
+    }
+    if (!lockAcquired) {
+      console.log(`[IFOOD_POLLING] skipped reason=lock_already_acquired merchant_id=${merchantId}`);
+      return new Response(
+        JSON.stringify({ skipped: true, reason: "lock_already_acquired", merchant_id: merchantId, new_orders: 0 }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    console.log(`[IFOOD_POLLING] lock_acquired merchant_id=${merchantId}`);
+
+    try {
     // Check token expiry (30 min buffer) — auto-refresh if needed
+
     let accessToken = config.access_token;
     const expiresAt = new Date(config.token_expires_at).getTime();
     const now = Date.now();
