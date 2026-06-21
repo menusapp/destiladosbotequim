@@ -1053,6 +1053,16 @@ Deno.serve(async (req) => {
       JSON.stringify({ success: true, new_orders: newOrdersCount, events_processed: eventIds.length }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+    } finally {
+      // Libera o lock SEMPRE — sucesso, erro ou exceção
+      try {
+        await supabase.rpc("release_polling_lock", { _key: lockKey });
+        console.log(`[IFOOD_POLLING] lock_released merchant_id=${merchantId}`);
+      } catch (releaseErr) {
+        console.error(`[IFOOD_POLLING] lock_release_error merchant_id=${merchantId} error=${(releaseErr as Error).message}`);
+      }
+    }
+
   } catch (error) {
     console.error("ifood-polling error:", error);
     return new Response(
