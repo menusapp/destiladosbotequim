@@ -5114,10 +5114,12 @@ export type Database = {
         Args: { _order_item_id: string }
         Returns: boolean
       }
+      release_polling_lock: { Args: { _key: string }; Returns: boolean }
       restore_stock_for_order_item: {
         Args: { p_order_item_id: string; p_restaurant_id: string }
         Returns: undefined
       }
+      try_acquire_polling_lock: { Args: { _key: string }; Returns: boolean }
       update_point_order_payment: {
         Args: {
           p_mp_order_id: string
