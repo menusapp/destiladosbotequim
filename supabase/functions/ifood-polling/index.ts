@@ -425,6 +425,7 @@ Deno.serve(async (req) => {
           headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
+            "X-Polling-Merchants": merchantId,
           },
           body: ackPayload,
         });
