@@ -199,10 +199,12 @@ const LandingDestilado = () => {
     };
   }, [reduceMotion, products.length]);
 
-  const logo = restaurant?.logo_url as string | undefined;
-  const banner = (restaurant?.banner_url || restaurant?.cover_url) as string | undefined;
+  const logo = (restaurant?.logo_url as string | undefined) || logoAsset.url;
+  const banner = (restaurant?.banner_url || restaurant?.cover_url) as string | undefined || facadeNightAsset.url;
+  const ambientPhoto = facadeDayAsset.url;
   const address = (restaurant?.store_address || restaurant?.address) as string | undefined;
-  const reelCards = products.length ? products : [];
+  const productsWithImages = products.filter((p) => !!p.image_url);
+  const reelCards: Prod[] = productsWithImages.length ? productsWithImages : HOUSE_GALLERY;
   // altura do "pin" proporcional à quantidade de cartões
   const reelHeight = `${120 + Math.max(reelCards.length || 4, 4) * 26}vh`;
 
