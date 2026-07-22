@@ -745,6 +745,7 @@ export type Database = {
           is_default: boolean | null
           neighborhood: string
           number: string
+          restaurant_id: string | null
           state: string
           street: string
           updated_at: string | null
@@ -761,6 +762,7 @@ export type Database = {
           is_default?: boolean | null
           neighborhood: string
           number: string
+          restaurant_id?: string | null
           state: string
           street: string
           updated_at?: string | null
@@ -777,12 +779,21 @@ export type Database = {
           is_default?: boolean | null
           neighborhood?: string
           number?: string
+          restaurant_id?: string | null
           state?: string
           street?: string
           updated_at?: string | null
           zip_code?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "customer_addresses_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       customer_cards: {
         Row: {
@@ -4747,6 +4758,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_customer_address: {
+        Args: {
+          p_city: string
+          p_complement?: string
+          p_cpf: string
+          p_is_default?: boolean
+          p_name: string
+          p_neighborhood: string
+          p_number: string
+          p_phone: string
+          p_state: string
+          p_street: string
+          p_zip_code: string
+        }
+        Returns: string
+      }
       admin_cancel_order_item: {
         Args: { p_order_item_id: string; p_restaurant_id: string }
         Returns: undefined
@@ -5020,6 +5047,15 @@ export type Database = {
             }
             Returns: string
           }
+      apply_loyalty: {
+        Args: {
+          p_cpf: string
+          p_order_id?: string
+          p_points: number
+          p_type: string
+        }
+        Returns: number
+      }
       auto_release_idle_tables: { Args: never; Returns: undefined }
       auto_release_inactive_tables: { Args: never; Returns: undefined }
       check_mp_token_expiry: {
@@ -5055,9 +5091,98 @@ export type Database = {
         Returns: string
       }
       cron_ifood_polling_30s: { Args: never; Returns: undefined }
+      current_restaurant_id: { Args: never; Returns: string }
+      current_staff_id: { Args: never; Returns: string }
+      current_staff_role: { Args: never; Returns: string }
       deduct_stock_for_order_item: {
         Args: { p_order_item_id: string }
         Returns: undefined
+      }
+      default_restaurant_id: { Args: never; Returns: string }
+      delete_customer_address: {
+        Args: { p_cpf: string; p_id: string }
+        Returns: boolean
+      }
+      delete_saved_card: {
+        Args: { p_cpf: string; p_id: string }
+        Returns: boolean
+      }
+      get_comanda_status: {
+        Args: { p_cpf: string; p_table_id: string }
+        Returns: {
+          closed_at: string
+          created_at: string
+          id: string
+          status: string
+          table_id: string
+        }[]
+      }
+      get_customer_by_cpf: {
+        Args: { p_cpf: string }
+        Returns: {
+          cpf: string
+          email: string
+          id: string
+          name: string
+          phone: string
+        }[]
+      }
+      get_customer_coupons: {
+        Args: { p_cpf: string }
+        Returns: {
+          coupon_code: string
+        }[]
+      }
+      get_customer_orders: {
+        Args: { p_cpf: string; p_phone: string }
+        Returns: {
+          cancellation_reason: string | null
+          comanda_id: string | null
+          coupon_code: string | null
+          coupon_discount: number | null
+          created_at: string | null
+          customer_cpf: string
+          customer_name: string
+          daily_order_number: number | null
+          dd_order_id: string | null
+          dd_scheduled_for: string | null
+          dd_source: boolean | null
+          delivery_address: string | null
+          delivery_city: string | null
+          delivery_fee: number | null
+          delivery_neighborhood: string | null
+          delivery_phone: string | null
+          delivery_type: string | null
+          id: string
+          ifood_display_id: string | null
+          ifood_merchant_id: string | null
+          ifood_order_id: string | null
+          ifood_source: boolean | null
+          loyalty_points_earned: number | null
+          loyalty_points_used: number | null
+          notes: string | null
+          online_payment_id: string | null
+          order_channel: string | null
+          order_type: string | null
+          paid_at: string | null
+          payment_brand: string | null
+          payment_status: string | null
+          payment_type: string | null
+          pdv_source: boolean
+          restaurant_id: string
+          reward_discount: number | null
+          reward_id: string | null
+          service_fee: number
+          status: string | null
+          table_id: string | null
+          updated_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "orders"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       get_kiosk_point_terminal: {
         Args: { p_restaurant_id: string }
@@ -5066,6 +5191,45 @@ export type Database = {
           device_name: string
           mp_pos_id: string
           mp_store_id: string
+        }[]
+      }
+      get_loyalty_balance: { Args: { p_cpf: string }; Returns: number }
+      get_my_reservations: {
+        Args: { p_cpf: string; p_phone: string }
+        Returns: {
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string | null
+          customer_cpf: string
+          customer_name: string
+          customer_phone: string
+          id: string
+          notes: string | null
+          party_size: number
+          reservation_date: string
+          reservation_table_id: string | null
+          reservation_time: string
+          restaurant_id: string
+          status: string | null
+          table_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "reservations"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      get_order_details: { Args: { p_order_id: string }; Returns: Json }
+      get_order_status: { Args: { p_order_id: string }; Returns: string }
+      get_payment_status: {
+        Args: { p_payment_id: string }
+        Returns: {
+          paid_at: string
+          status: string
         }[]
       }
       get_point_order_payment: {
@@ -5097,11 +5261,38 @@ export type Database = {
           restaurant_id: string
         }[]
       }
+      get_reservation_availability: {
+        Args: { p_date: string }
+        Returns: {
+          reservation_date: string
+          reservation_table_id: string
+          reservation_time: string
+          status: string
+        }[]
+      }
       get_restaurant_rating_stats: {
         Args: { p_restaurant_id: string }
         Returns: {
           average_rating: number
           total_reviews: number
+        }[]
+      }
+      get_saved_cards: {
+        Args: { p_cpf: string; p_phone: string }
+        Returns: {
+          expiration_month: number
+          expiration_year: number
+          id: string
+          last_four_digits: string
+          payment_method_id: string
+        }[]
+      }
+      get_whatsapp_public_config: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          enabled: boolean
+          instance_status: string
+          message_reservation_created: string
         }[]
       }
       has_role: {
@@ -5125,6 +5316,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      is_ceo: { Args: never; Returns: boolean }
       is_restaurant_admin: {
         Args: { rest_id: string; user_uuid: string }
         Returns: boolean
@@ -5133,6 +5325,34 @@ export type Database = {
         Args: { _order_item_id: string }
         Returns: boolean
       }
+      is_staff: { Args: never; Returns: boolean }
+      list_customer_addresses: {
+        Args: { p_cpf: string; p_phone: string }
+        Returns: {
+          city: string
+          complement: string | null
+          created_at: string | null
+          customer_cpf: string
+          customer_name: string
+          customer_phone: string
+          id: string
+          is_default: boolean | null
+          neighborhood: string
+          number: string
+          restaurant_id: string | null
+          state: string
+          street: string
+          updated_at: string | null
+          zip_code: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "customer_addresses"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      redeem_coupon: { Args: { p_code: string }; Returns: boolean }
       release_polling_lock: { Args: { _key: string }; Returns: boolean }
       restore_stock_for_order_item: {
         Args: { p_order_item_id: string; p_restaurant_id: string }
@@ -5151,12 +5371,51 @@ export type Database = {
         }
         Returns: undefined
       }
+      upsert_customer: {
+        Args: {
+          p_cpf: string
+          p_email?: string
+          p_name: string
+          p_phone?: string
+        }
+        Returns: string
+      }
       validate_ceo_credentials: {
         Args: { p_password: string; p_username: string }
         Returns: {
           ceo_user_id: string
           display_name: string
         }[]
+      }
+      validate_coupon: {
+        Args: { p_code: string }
+        Returns: {
+          code: string
+          coupon_type: string | null
+          created_at: string | null
+          discount_type: string
+          discount_value: number
+          id: string
+          is_active: boolean | null
+          max_discount: number | null
+          min_order_value: number | null
+          restaurant_id: string
+          target_extra_id: string | null
+          target_product_extra_id: string | null
+          target_product_id: string | null
+          updated_at: string | null
+          usage_limit: number | null
+          usage_limit_per_user: number | null
+          used_count: number | null
+          valid_from: string | null
+          valid_until: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "coupons"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       validate_restaurant_credentials: {
         Args: { p_password: string; p_username: string }
