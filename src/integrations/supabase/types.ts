@@ -4848,14 +4848,14 @@ export type Database = {
       }
       admin_create_first_staff: {
         Args: {
-          p_allowed_sections: string
+          p_allowed_sections?: string
           p_display_name: string
           p_password_hash: string
           p_restaurant_id: string
-          p_role: string
+          p_role?: string
           p_username: string
         }
-        Returns: undefined
+        Returns: string
       }
       admin_create_staff: {
         Args: {
