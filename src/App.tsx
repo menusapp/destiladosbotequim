@@ -106,10 +106,12 @@ const App = () => (
                 Quando acessado via subdomínio do restaurante (ex.: rods.menusapp.com.br/),
                 a raiz "/" carrega o cardápio delivery; caso contrário mostra a landing.
               */}
-              <Route
-                path="/"
-                element={isOnRestaurantSubdomain() ? <DeliveryMenu /> : <LandingPageV3 />}
-              />
+              {/*
+                App de estabelecimento único: a raiz "/" mostra o cardápio do
+                Destilado Botequim (resolvido via ESTABLISHMENT.slug), não a
+                landing genérica do SaaS. A equipe entra pelo /login.
+              */}
+              <Route path="/" element={<DeliveryMenu />} />
 
               {/* Auth routes */}
               <Route path="/login" element={<RestaurantLogin />} />

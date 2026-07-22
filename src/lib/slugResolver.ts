@@ -1,3 +1,4 @@
+import { ESTABLISHMENT } from "@/config/establishment";
 /**
  * Slug Resolver — Detecta o slug do restaurante a partir do subdomínio ou da URL.
  *
@@ -68,10 +69,12 @@ export function getSlugFromSubdomain(): string | null {
 
 /**
  * Helper para hooks/páginas: retorna o slug do subdomínio se houver,
- * senão usa o slug do path (useParams).
+ * senão usa o slug do path (useParams). Como este app é de um único
+ * estabelecimento, o último fallback é o slug configurado em
+ * ESTABLISHMENT.slug — assim a raiz "/" resolve o estabelecimento.
  */
 export function resolveSlug(pathSlug?: string): string | undefined {
-  return getSlugFromSubdomain() || pathSlug || undefined;
+  return getSlugFromSubdomain() || pathSlug || ESTABLISHMENT.slug || undefined;
 }
 
 /**

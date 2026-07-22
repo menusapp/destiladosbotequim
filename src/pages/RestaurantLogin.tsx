@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { markSessionActive, getActiveAdminRedirectPath } from "@/lib/sessionExpiry";
 import menusLogo from "@/assets/menus-logo.png";
+import { ESTABLISHMENT } from "@/config/establishment";
 
 const Landing = () => {
   const navigate = useNavigate();
@@ -85,10 +86,11 @@ const Landing = () => {
       <Card className="w-full max-w-md shadow-lg border-border/50">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto w-32 h-32 flex items-center justify-center">
-            <img src={menusLogo} alt="Menu's" className="w-full h-full object-contain" />
+            <img src={menusLogo} alt={ESTABLISHMENT.name} className="w-full h-full object-contain" />
           </div>
+          <h2 className="text-xl font-bold text-foreground">{ESTABLISHMENT.name}</h2>
           <CardDescription className="text-base">
-            Sistema de Gestão de Cardápios Digitais
+            {ESTABLISHMENT.tagline}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
