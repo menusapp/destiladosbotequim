@@ -478,7 +478,8 @@ const LandingDestilado = () => {
 function ReelCard({ product }: { product?: Prod }) {
   const price = product ? (product.promotional_price ?? product.price) : null;
   return (
-    <div className="w-[68vw] max-w-[340px] shrink-0 sm:w-[340px]" style={{ willChange: "transform, opacity" }}>
+    <div className="w-full" style={{ willChange: "transform, opacity" }}>
+
       <div className="relative aspect-[3/4] overflow-hidden rounded-2xl" style={{ background: "#16382a" }}>
         {product?.image_url ? (
           <img src={product.image_url} alt={product.name} className="h-full w-full object-cover transition-transform duration-700 hover:scale-105" />
