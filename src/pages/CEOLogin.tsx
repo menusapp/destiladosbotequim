@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, applyRealtimeAuth } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
+import { setSessionToken } from "@/lib/authSession";
 import menusLogo from "@/assets/menus-logo.png";
 import { Crown } from "lucide-react";
 
@@ -21,15 +22,20 @@ const CEOLogin = () => {
     setLoading(true);
 
     try {
-      const { data, error } = await (supabase as any).rpc("validate_ceo_credentials", {
-        p_username: username.trim(),
-        p_password: password,
+      const { data: resp, error } = await supabase.functions.invoke("issue-session-token", {
+        body: { type: "ceo", username: username.trim(), password },
       });
 
       if (error) throw error;
+      if (resp?.error) {
+        toast.error(resp.error);
+        return;
+      }
 
-      if (data && Array.isArray(data) && data.length > 0) {
-        const ceoUser = data[0];
+      if (resp?.token && resp?.data) {
+        const ceoUser = resp.data;
+        setSessionToken(resp.token, resp.expires_at);
+        applyRealtimeAuth();
         localStorage.setItem("ceo_user_id", ceoUser.ceo_user_id);
         localStorage.setItem("ceo_display_name", ceoUser.display_name);
         toast.success(`Bem-vindo, ${ceoUser.display_name}!`);

@@ -11,6 +11,8 @@
  * O `ProtectedRoute` chama `isSessionExpired()` antes de liberar acesso.
  */
 
+import { clearSessionToken } from "@/lib/authSession";
+
 const SESSION_TIMESTAMP_KEY = "admin_session_started_at";
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
 
@@ -70,6 +72,7 @@ export function clearAdminSession(): void {
   } catch {
     // ignore
   }
+  clearSessionToken();
   clearSessionTimestamp();
 }
 

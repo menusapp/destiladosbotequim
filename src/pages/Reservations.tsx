@@ -258,11 +258,10 @@ const Reservations = () => {
       
       if (cleanPhone) {
         // Buscar config do WhatsApp
-        const { data: whatsappConfig } = await supabase
-          .from('whatsapp_config')
-          .select('enabled, instance_status, message_reservation_created')
-          .eq('restaurant_id', restaurant.id)
-          .maybeSingle();
+        // Config pública do WhatsApp via RPC (sem expor api_token da tabela).
+        const { data: whatsappRows } = await (supabase as any)
+          .rpc('get_whatsapp_public_config', { p_restaurant_id: restaurant.id });
+        const whatsappConfig = Array.isArray(whatsappRows) ? whatsappRows[0] : whatsappRows;
 
         if (whatsappConfig?.enabled && whatsappConfig?.instance_status === 'connected') {
           const defaultMessage = "📅 Olá {nome}! Sua reserva foi recebida e está aguardando confirmação.\n\n🪑 Mesa: {mesa}\n📆 Data: {data}\n⏰ Horário: {horario}\n👥 Pessoas: {pessoas}\n\nEm breve você receberá a confirmação!";

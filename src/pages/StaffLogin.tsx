@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, applyRealtimeAuth } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/sonner";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { markSessionActive } from "@/lib/sessionExpiry";
+import { setSessionToken } from "@/lib/authSession";
 import menusLogo from "@/assets/menus-logo.png";
 
 const StaffLogin = () => {
@@ -167,16 +168,28 @@ const StaffLogin = () => {
     setLoading(true);
 
     try {
-      const { data, error } = await (supabase as any).rpc("validate_staff_credentials", {
-        p_restaurant_id: restaurantId,
-        p_username: username.trim(),
-        p_password: password,
+      // Valida credenciais e obtém um token de sessão assinado (identidade
+      // autenticada). A edge function chama validate_staff_credentials com
+      // service_role e assina o JWT com os claims restaurant_id/staff_id/role.
+      const { data: resp, error } = await supabase.functions.invoke("issue-session-token", {
+        body: {
+          type: "staff",
+          restaurant_id: restaurantId,
+          username: username.trim(),
+          password,
+        },
       });
 
       if (error) throw error;
+      if (resp?.error) {
+        toast.error(resp.error);
+        return;
+      }
 
-      if (data && Array.isArray(data) && data.length > 0) {
-        const staff = data[0];
+      if (resp?.token && resp?.data) {
+        const staff = resp.data;
+        setSessionToken(resp.token, resp.expires_at);
+        applyRealtimeAuth();
         localStorage.setItem("staff_id", staff.staff_id);
         localStorage.setItem("staff_name", staff.display_name);
         localStorage.setItem("staff_role", staff.role);
