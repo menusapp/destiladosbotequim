@@ -904,6 +904,7 @@ export type Database = {
           abandoned_at: string | null
           cart_items: Json | null
           cart_value: number | null
+          checkout_step: string | null
           created_at: string | null
           id: string
           last_activity: string | null
@@ -917,6 +918,7 @@ export type Database = {
           abandoned_at?: string | null
           cart_items?: Json | null
           cart_value?: number | null
+          checkout_step?: string | null
           created_at?: string | null
           id?: string
           last_activity?: string | null
@@ -930,6 +932,7 @@ export type Database = {
           abandoned_at?: string | null
           cart_items?: Json | null
           cart_value?: number | null
+          checkout_step?: string | null
           created_at?: string | null
           id?: string
           last_activity?: string | null
@@ -3267,6 +3270,64 @@ export type Database = {
           },
         ]
       }
+      product_upsells: {
+        Row: {
+          created_at: string
+          discount_type: string
+          discount_value: number
+          id: string
+          is_active: boolean
+          restaurant_id: string
+          trigger_product_id: string
+          updated_at: string
+          upsell_product_id: string
+        }
+        Insert: {
+          created_at?: string
+          discount_type?: string
+          discount_value: number
+          id?: string
+          is_active?: boolean
+          restaurant_id: string
+          trigger_product_id: string
+          updated_at?: string
+          upsell_product_id: string
+        }
+        Update: {
+          created_at?: string
+          discount_type?: string
+          discount_value?: number
+          id?: string
+          is_active?: boolean
+          restaurant_id?: string
+          trigger_product_id?: string
+          updated_at?: string
+          upsell_product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_upsells_restaurant_id_fkey"
+            columns: ["restaurant_id"]
+            isOneToOne: false
+            referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_upsells_trigger_product_id_fkey"
+            columns: ["trigger_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_upsells_upsell_product_id_fkey"
+            columns: ["upsell_product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           available: boolean | null
@@ -4535,6 +4596,7 @@ export type Database = {
           message_reservation_created: string | null
           phone_number: string | null
           restaurant_id: string
+          review_link_url: string | null
           updated_at: string | null
         }
         Insert: {
@@ -4559,6 +4621,7 @@ export type Database = {
           message_reservation_created?: string | null
           phone_number?: string | null
           restaurant_id: string
+          review_link_url?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -4583,6 +4646,7 @@ export type Database = {
           message_reservation_created?: string | null
           phone_number?: string | null
           restaurant_id?: string
+          review_link_url?: string | null
           updated_at?: string | null
         }
         Relationships: [
