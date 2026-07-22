@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Minus, Plus, Trash2, Ticket } from "lucide-react";
 import { CartItem } from "@/types/menu";
 import { Card } from "@/components/ui/card";
+import { UpsellOfferCard } from "./UpsellOfferCard";
+import { useCartUpsells, buildUpsellCartItem, UpsellOffer } from "@/hooks/useCartUpsells";
 
 interface CartDrawerProps {
   open: boolean;
@@ -16,6 +18,7 @@ interface CartDrawerProps {
   onAddMoreItems: () => void;
   onContinue: () => void;
   mode: "delivery" | "local"; // delivery = sacola, local = comanda
+  onAddItem?: (item: CartItem) => void;
 }
 
 export const CartDrawer = ({
@@ -30,7 +33,14 @@ export const CartDrawer = ({
   onAddMoreItems,
   onContinue,
   mode,
+  onAddItem,
 }: CartDrawerProps) => {
+  const upsellsByTrigger = useCartUpsells(items);
+
+  const handleAddUpsell = (offer: UpsellOffer) => {
+    if (!onAddItem) return;
+    onAddItem(buildUpsellCartItem(offer));
+  };
   const total = items.reduce((sum, item) => {
     const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
     const effectivePrice = item.product.promotional_price ?? item.product.price;
@@ -89,8 +99,11 @@ export const CartDrawer = ({
                   (effectivePrice + item.extras.reduce((s, e) => s + e.price, 0)) *
                   item.quantity;
 
+                const itemUpsells = upsellsByTrigger[item.product.id] || [];
+
                 return (
-                  <Card key={item.id} className="p-3">
+                  <div key={item.id}>
+                  <Card className="p-3">
                     <div className="flex gap-3">
                       {item.product.image_url && (
                         <img
@@ -146,12 +159,16 @@ export const CartDrawer = ({
                       </div>
                     </div>
                   </Card>
+                  {/* Ofertas "peça junto com desconto" deste item */}
+                  {onAddItem &&
+                    itemUpsells.map((offer) => (
+                      <UpsellOfferCard key={offer.id} offer={offer} onAdd={handleAddUpsell} />
+                    ))}
+                  </div>
                 );
               })}
             </div>
           </div>
-
-          {/* Upsell suggestions can go here */}
 
           {/* Coupon */}
           <Card className="p-4 mb-4">

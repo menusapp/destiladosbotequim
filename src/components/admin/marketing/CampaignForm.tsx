@@ -85,7 +85,7 @@ export function CampaignForm({
   const [triggerProductId, setTriggerProductId] = useState<string>("");
   const [triggerCategoryId, setTriggerCategoryId] = useState<string>("");
   const [delayValue, setDelayValue] = useState(3);
-  const [delayUnit, setDelayUnit] = useState<"seconds" | "minutes" | "hours" | "days">("days");
+  const [delayUnit, setDelayUnit] = useState<"seconds" | "minutes" | "hours" | "days" | "weeks" | "months">("days");
   const [orderTypeFilter, setOrderTypeFilter] = useState<"all" | "online" | "local">("all");
   const [messageTemplate, setMessageTemplate] = useState(
     "Olá {nome}! 🎉\n\nSentimos sua falta! Use o cupom {cupom} e ganhe {desconto} na sua próxima compra!\n\nVálido por {validade} dias. Te esperamos!"
@@ -436,6 +436,8 @@ export function CampaignForm({
                   <SelectItem value="minutes">Minutos</SelectItem>
                   <SelectItem value="hours">Horas</SelectItem>
                   <SelectItem value="days">Dias</SelectItem>
+                  <SelectItem value="weeks">Semanas</SelectItem>
+                  <SelectItem value="months">Meses</SelectItem>
                 </SelectContent>
               </Select>
             </div>

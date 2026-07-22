@@ -23,7 +23,18 @@ interface AbandonedSession {
   abandoned_at: string | null;
   last_activity: string | null;
   status: string;
+  checkout_step: string | null;
 }
+
+// Rótulo amigável da etapa do funil em que o cliente parou.
+const CHECKOUT_STEP_LABELS: Record<string, string> = {
+  cart: "Sacola",
+  "delivery-type": "Tipo de entrega",
+  address: "Endereço",
+  payment: "Pagamento",
+  "online-payment": "Pagamento online",
+  summary: "Revisão final",
+};
 
 interface InactiveCustomer {
   id: string;
@@ -109,7 +120,7 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
       const [abandonedRes, potentialRes] = await Promise.all([
         supabase
           .from("customer_sessions" as any)
-          .select("id, name, phone, cart_items, cart_value, abandoned_at, last_activity, status")
+          .select("id, name, phone, cart_items, cart_value, abandoned_at, last_activity, status, checkout_step")
           .eq("restaurant_id", restaurantId)
           .eq("status", "abandoned")
           .gte("abandoned_at", since.toISOString())
@@ -117,7 +128,7 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
           .limit(100) as any,
         supabase
           .from("customer_sessions" as any)
-          .select("id, name, phone, cart_items, cart_value, abandoned_at, last_activity, status")
+          .select("id, name, phone, cart_items, cart_value, abandoned_at, last_activity, status, checkout_step")
           .eq("restaurant_id", restaurantId)
           .in("status", ["cart_added", "checkout_started"])
           .lt("last_activity", thirtyMinAgo)
@@ -340,6 +351,7 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
                     <TableHead>Telefone</TableHead>
                     <TableHead>Itens</TableHead>
                     <TableHead>Valor</TableHead>
+                    <TableHead>Parou em</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Tempo</TableHead>
                   </TableRow>
@@ -364,6 +376,15 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
                         </div>
                       </TableCell>
                       <TableCell className="font-semibold">R$ {Number(s.cart_value).toFixed(2)}</TableCell>
+                      <TableCell>
+                        {s.checkout_step ? (
+                          <Badge variant="outline" className="text-xs border-blue-400 text-blue-600">
+                            {CHECKOUT_STEP_LABELS[s.checkout_step] || s.checkout_step}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Navegando</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         {s.status === "abandoned" ? (
                           <Badge variant="destructive" className="text-xs">Abandonado</Badge>

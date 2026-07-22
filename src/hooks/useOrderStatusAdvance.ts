@@ -105,7 +105,8 @@ export function useOrderStatusAdvance(restaurantId: string) {
   const sendWhatsAppNotification = async (order: Order, newStatus: string, reason?: string) => {
     try {
       let notificationType: string | null = null;
-      if (newStatus === "accepted" || newStatus === "preparing") notificationType = "order_accepted";
+      if (newStatus === "accepted") notificationType = "order_accepted";
+      else if (newStatus === "preparing") notificationType = "order_preparing";
       else if (newStatus === "out_for_delivery") notificationType = "order_out_for_delivery";
       else if (newStatus === "ready") notificationType = "order_ready_pickup";
       else if (newStatus === "cancelled") notificationType = "order_cancelled";

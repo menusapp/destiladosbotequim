@@ -101,8 +101,17 @@ export function useSessionTracking(restaurantId: string | undefined, restaurantS
   const trackCheckoutStarted = useCallback(() => {
     if (lastStatus.current === "checkout_started") return;
     lastStatus.current = "checkout_started";
-    upsertSession({ status: "checkout_started" });
+    upsertSession({ status: "checkout_started", checkout_step: "cart" });
   }, [upsertSession]);
+
+  // Rastreia a ETAPA do checkout em que o cliente está (funil de abandono):
+  // cart → delivery-type → address → payment → online-payment → summary.
+  const trackCheckoutStep = useCallback(
+    (stepId: string) => {
+      upsertSession({ status: "checkout_started", checkout_step: stepId }, true);
+    },
+    [upsertSession]
+  );
 
   const trackCompleted = useCallback(() => {
     lastStatus.current = "completed";
@@ -122,6 +131,7 @@ export function useSessionTracking(restaurantId: string | undefined, restaurantS
   return {
     trackCartUpdate,
     trackCheckoutStarted,
+    trackCheckoutStep,
     trackCompleted,
     trackCustomerInfo,
   };

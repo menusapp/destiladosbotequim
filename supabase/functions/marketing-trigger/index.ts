@@ -206,6 +206,12 @@ Deno.serve(async (req) => {
             case "days":
               scheduledFor.setDate(scheduledFor.getDate() + rule.delay_value);
               break;
+            case "weeks":
+              scheduledFor.setDate(scheduledFor.getDate() + rule.delay_value * 7);
+              break;
+            case "months":
+              scheduledFor.setMonth(scheduledFor.getMonth() + rule.delay_value);
+              break;
           }
 
           // Generate coupon code or use existing coupon

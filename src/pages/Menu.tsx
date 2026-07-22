@@ -1275,6 +1275,10 @@ const Menu = () => {
           navigate(`/${restaurantSlug}/comanda/${tableNumber}`);
         }}
         mode="local"
+        onAddItem={(item) => {
+          setCart((prev) => [...prev, item]);
+          toast.success(`${item.product.name} adicionado com desconto! 🎉`);
+        }}
       />
 
       <ReviewModal

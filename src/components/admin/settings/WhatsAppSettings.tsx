@@ -12,10 +12,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import QRCode from "qrcode";
-import { 
+import {
   MessageSquare, WifiOff, QrCode, RefreshCw, Loader2,
   CheckCircle2, Smartphone, Send, ChevronDown, User, Clock,
-  Bell, ShoppingCart, Star, XCircle, Truck, Phone
+  Bell, ShoppingCart, Star, XCircle, Truck, Phone, ChefHat, PackageCheck
 } from "lucide-react";
 
 interface WhatsAppConfig {
@@ -74,12 +74,26 @@ const CLIENT_NOTIFICATION_DEFAULTS: Record<string, { label: string; icon: any; t
     variables: "{{nome}}, {{numero_pedido}}, {{tempo_estimado}}, {{resumo_pedido}}, {{total_pedido}}",
     color: "text-green-600",
   },
+  order_preparing: {
+    label: "Em Preparo",
+    icon: ChefHat,
+    template: "👨‍🍳 Olá {{nome}}! Seu pedido #{{numero_pedido}} está em preparo!\n\n⏱️ Tempo estimado: {{tempo_estimado}} minutos.",
+    variables: "{{nome}}, {{numero_pedido}}, {{tempo_estimado}}",
+    color: "text-orange-600",
+  },
   order_out_for_delivery: {
     label: "Aviso de Saída / Pronto",
     icon: Truck,
     template: "🚗 Olá {{nome}}! Seu pedido #{{numero_pedido}} saiu para entrega / está pronto para retirada!",
     variables: "{{nome}}, {{numero_pedido}}",
     color: "text-blue-600",
+  },
+  order_ready_pickup: {
+    label: "Pronto para Retirada",
+    icon: PackageCheck,
+    template: "📦 Olá {{nome}}! Seu pedido #{{numero_pedido}} está pronto para retirada! Aguardamos você! 😊",
+    variables: "{{nome}}, {{numero_pedido}}",
+    color: "text-emerald-600",
   },
   order_cancelled: {
     label: "Aviso de Cancelamento",
@@ -142,6 +156,7 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   const [connectFlowActive, setConnectFlowActive] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [config, setConfig] = useState<WhatsAppConfig | null>(null);
+  const [reviewLink, setReviewLink] = useState("");
   
   const [messages, setMessages] = useState({
     accepted: DEFAULT_MESSAGES.accepted,
@@ -194,7 +209,8 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
       if (error) throw error;
       if (data) {
         setConfig(data);
-        
+        setReviewLink((data as any).review_link_url || "");
+
         setMessages({
           accepted: data.message_accepted || DEFAULT_MESSAGES.accepted,
           out_for_delivery: data.message_out_for_delivery || DEFAULT_MESSAGES.out_for_delivery,
@@ -419,6 +435,15 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
 
       const { error } = await supabase.from('whatsapp_notification_configs').upsert(upserts, { onConflict: 'restaurant_id,notification_type' });
       if (error) throw error;
+
+      // Salva também o link de avaliação (usado em {{link_avaliacao}}).
+      const { error: linkError } = await supabase.from('whatsapp_config').upsert({
+        restaurant_id: restaurantId,
+        review_link_url: reviewLink.trim() || null,
+        updated_at: new Date().toISOString(),
+      } as any, { onConflict: 'restaurant_id' });
+      if (linkError) throw linkError;
+
       toast({ title: "Salvo", description: "Configurações de notificação salvas" });
     } catch (error) {
       console.error('Error saving notifs:', error);
@@ -649,6 +674,29 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
 
         {/* Cliente Tab */}
         <TabsContent value="cliente" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Star className="h-5 w-5 text-yellow-500" />
+                Link de Avaliação
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Label htmlFor="reviewLink">
+                Usado na variável {"{{link_avaliacao}}"} da mensagem de pedido finalizado
+              </Label>
+              <Input
+                id="reviewLink"
+                placeholder="Ex: https://g.page/r/SEU_LINK_GOOGLE/review (vazio = página do pedido)"
+                value={reviewLink}
+                onChange={(e) => setReviewLink(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Cole aqui o link de avaliação do Google (ou qualquer link personalizado).
+                Se deixar vazio, o cliente recebe o link da página do pedido no app.
+              </p>
+            </CardContent>
+          </Card>
           {Object.entries(CLIENT_NOTIFICATION_DEFAULTS).map(([type, def]) =>
             renderNotificationCard(type, def, clientNotifs, setClientNotifs, type === 'cart_recovery')
           )}

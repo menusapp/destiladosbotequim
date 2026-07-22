@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
     // Check WhatsApp is connected
     const { data: waConfig } = await supabase
       .from('whatsapp_config')
-      .select('enabled, instance_status')
+      .select('enabled, instance_status, review_link_url')
       .eq('restaurant_id', restaurant_id)
       .maybeSingle();
 
@@ -233,6 +233,12 @@ Deno.serve(async (req) => {
       enrichedContext.resumo_pedido = '';
       enrichedContext.total_pedido = '';
       console.log('[NOTIF] needsSummary but no orderId resolved — variables emptied');
+    }
+
+    // Link de avaliação configurável no painel (Google/personalizado).
+    // Quando definido, substitui o link padrão (página do pedido).
+    if (waConfig?.review_link_url) {
+      enrichedContext.link_avaliacao = waConfig.review_link_url;
     }
 
     // Replace variables in template

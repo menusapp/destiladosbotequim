@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getAllUsedPdvCodes } from "@/lib/pdvCodeGenerator";
+import { UpsellManagerCard } from "./UpsellManagerCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -1720,6 +1721,9 @@ const handleDelete = async (id: string) => {
         </CollapsibleContent>
       </Card>
       </Collapsible>
+
+      {/* Ofertas da Sacola (upsell por produto) */}
+      <UpsellManagerCard restaurantId={restaurantId} />
     </div>
   );
 };

@@ -59,6 +59,7 @@ interface CheckoutDrawerProps {
   customerCPF?: string;
   onSuggestionClick?: (product: any) => void;
   onRequireLogin?: () => void;
+  onCheckoutStep?: (stepId: string) => void;
 }
 
 const primaryColorFromRestaurant = (restaurant: any) => restaurant?.primary_color || "#fe9516";
@@ -76,9 +77,16 @@ export const CheckoutDrawer = ({
   customerCPF: customerCPFProp,
   onSuggestionClick,
   onRequireLogin,
+  onCheckoutStep,
 }: CheckoutDrawerProps) => {
   const navigate = useNavigate();
   const [step, setStep] = useState<CheckoutStep>("cart");
+
+  // Rastreia a etapa atual do checkout (funil de abandono).
+  useEffect(() => {
+    if (open && onCheckoutStep) onCheckoutStep(step);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, open]);
   const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">("delivery");
   const [coupon, setCoupon] = useState<any>(null);
   const [customerData, setCustomerData] = useState<any>(null);
@@ -639,6 +647,7 @@ export const CheckoutDrawer = ({
             activeRewardDiscount={activeRewardDiscount}
             onClearRewardDiscount={handleClearRewardDiscount}
             onSuggestionClick={onSuggestionClick}
+            onAddUpsellItem={onAddRewardItem}
           />
         );
       case "delivery-type":

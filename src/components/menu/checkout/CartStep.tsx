@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Minus, Plus, Trash2, AlertCircle, Gift, X, Ticket } from "lucide-react";
 import { CartItem } from "@/types/menu";
 import { ProductSuggestions } from "./ProductSuggestions";
+import { UpsellOfferCard } from "../UpsellOfferCard";
+import { useCartUpsells, buildUpsellCartItem, UpsellOffer } from "@/hooks/useCartUpsells";
 import { CouponInput, CouponInputRef } from "./CouponInput";
 import { LoyaltyPointsDisplay } from "./LoyaltyPointsDisplay";
 import { LoyaltyRewardNotification, DiscountReward } from "./LoyaltyRewardNotification";
@@ -43,6 +45,7 @@ interface CartStepProps {
   activeRewardDiscount?: DiscountReward | null;
   onClearRewardDiscount?: () => void;
   onSuggestionClick?: (product: any) => void;
+  onAddUpsellItem?: (item: CartItem) => void;
 }
 
 export const CartStep = ({
@@ -64,8 +67,16 @@ export const CartStep = ({
   activeRewardDiscount,
   onClearRewardDiscount,
   onSuggestionClick,
+  onAddUpsellItem,
 }: CartStepProps) => {
   const couponInputRef = useRef<CouponInputRef>(null);
+  const upsellsByTrigger = useCartUpsells(cart);
+
+  const handleAddUpsell = (offer: UpsellOffer) => {
+    if (!onAddUpsellItem) return;
+    onAddUpsellItem(buildUpsellCartItem(offer));
+    toast.success(`${offer.product.name} adicionado com desconto! 🎉`);
+  };
 
   const handleUseCoupon = (couponCode: string) => {
     if (couponInputRef.current) {
@@ -167,8 +178,14 @@ export const CartStep = ({
               (effectivePrice + item.extras.reduce((s, e) => s + e.price, 0)) *
               item.quantity;
 
+            const itemUpsells =
+              !item.isRewardItem && !item.isCouponFreeItem
+                ? upsellsByTrigger[item.product.id] || []
+                : [];
+
             return (
-              <Card key={item.id}>
+              <div key={item.id}>
+              <Card>
                 <CardContent className="p-3">
                   <div className="flex gap-3">
                     {item.product.image_url && (
@@ -245,6 +262,12 @@ export const CartStep = ({
                   </div>
                 </CardContent>
               </Card>
+              {/* Ofertas "peça junto com desconto" deste item */}
+              {onAddUpsellItem &&
+                itemUpsells.map((offer) => (
+                  <UpsellOfferCard key={offer.id} offer={offer} onAdd={handleAddUpsell} />
+                ))}
+              </div>
             );
           })}
         </div>
