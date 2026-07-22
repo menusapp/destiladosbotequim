@@ -28,9 +28,9 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { isOnRestaurantSubdomain } from "@/lib/slugResolver";
 import { MetaPixelRouteTracker } from "@/components/MetaPixelRouteTracker";
 
+const LandingDestilado = lazyWithRetry(() => import("./pages/LandingDestilado"));
 const LandingPage = lazyWithRetry(() => import("./pages/LandingPage"));
 const LandingPageV2 = lazyWithRetry(() => import("./pages/LandingPageV2"));
 const LandingPageV3 = lazyWithRetry(() => import("./pages/LandingPageV3"));
@@ -107,11 +107,12 @@ const App = () => (
                 a raiz "/" carrega o cardápio delivery; caso contrário mostra a landing.
               */}
               {/*
-                App de estabelecimento único: a raiz "/" mostra o cardápio do
-                Destilado Botequim (resolvido via ESTABLISHMENT.slug), não a
-                landing genérica do SaaS. A equipe entra pelo /login.
+                App de estabelecimento único: a raiz "/" é a landing
+                cinematográfica do Destilado Botequim. O cardápio fica em
+                /cardapio (e também no slug). A equipe entra pelo /login.
               */}
-              <Route path="/" element={<DeliveryMenu />} />
+              <Route path="/" element={<LandingDestilado />} />
+              <Route path="/cardapio" element={<DeliveryMenu />} />
 
               {/* Auth routes */}
               <Route path="/login" element={<RestaurantLogin />} />
