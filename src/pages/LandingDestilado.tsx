@@ -4,6 +4,27 @@ import { supabase } from "@/integrations/supabase/client";
 import { ESTABLISHMENT } from "@/config/establishment";
 import { useReveal } from "@/hooks/useReveal";
 import { Flame, Wine, Users, Instagram, MapPin, ArrowRight, ChevronDown } from "lucide-react";
+import bolinhosAsset from "@/assets/destilado/bolinhos.webp.asset.json";
+import burgerAsset from "@/assets/destilado/burger.webp.asset.json";
+import carneSecaAsset from "@/assets/destilado/carne-seca.webp.asset.json";
+import frangoDrinkAsset from "@/assets/destilado/frango-drink.webp.asset.json";
+import iscasChoppAsset from "@/assets/destilado/iscas-chopp.webp.asset.json";
+import picanhaFritasAsset from "@/assets/destilado/picanha-fritas.webp.asset.json";
+import picanhaHeinekenAsset from "@/assets/destilado/picanha-heineken.webp.asset.json";
+import facadeDayAsset from "@/assets/destilado/facade-day.webp.asset.json";
+import facadeNightAsset from "@/assets/destilado/facade-night.webp.asset.json";
+import logoAsset from "@/assets/destilado/logo.jpg.asset.json";
+
+/* Fotos reais do Destilado — usadas como fallback quando não há produtos cadastrados */
+const HOUSE_GALLERY: Prod[] = [
+  { id: "h-picanha", name: "Picanha na chapa com fritas", price: 0, promotional_price: null, image_url: picanhaFritasAsset.url },
+  { id: "h-iscas",   name: "Iscas de frango & chopp",     price: 0, promotional_price: null, image_url: iscasChoppAsset.url },
+  { id: "h-bolinhos",name: "Trio de bolinhos da casa",     price: 0, promotional_price: null, image_url: bolinhosAsset.url },
+  { id: "h-carne",   name: "Carne seca com mandioca",      price: 0, promotional_price: null, image_url: carneSecaAsset.url },
+  { id: "h-burger",  name: "Burger cheddar & cebola",      price: 0, promotional_price: null, image_url: burgerAsset.url },
+  { id: "h-frango",  name: "Frango à passarinho",          price: 0, promotional_price: null, image_url: frangoDrinkAsset.url },
+  { id: "h-brinde",  name: "Brinde com picanha & Heineken",price: 0, promotional_price: null, image_url: picanhaHeinekenAsset.url },
+];
 
 /* Paleta da marca — calibrada pelas fotos reais do Destilado:
    verde do letreiro, luz âmbar quente da fachada, creme das paredes,
