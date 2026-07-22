@@ -5,15 +5,18 @@ import { ESTABLISHMENT } from "@/config/establishment";
 import { useReveal } from "@/hooks/useReveal";
 import { Flame, Wine, Users, Instagram, MapPin, ArrowRight, ChevronDown } from "lucide-react";
 
-/* Paleta da marca (sempre a mesma, independente do tema claro/escuro) */
+/* Paleta da marca — calibrada pelas fotos reais do Destilado:
+   verde do letreiro, luz âmbar quente da fachada, creme das paredes,
+   e a escuridão morna da noite. */
 const C = {
-  greenDeep: "#0f2c1e",
-  green: "#1f4d33",
-  greenSoft: "#2c6144",
-  cream: "#f4ecd6",
-  creamSoft: "#efe6cd",
-  gold: "#c9a24b",
-  ink: "#16241c",
+  greenDeep: "#0c2416",   // verde quase preto (céu/noite)
+  green: "#184a2d",       // verde do letreiro
+  greenSoft: "#276a41",   // verde iluminado
+  cream: "#f1e7cd",       // creme das paredes
+  creamSoft: "#e8dabb",
+  gold: "#d8a24a",        // âmbar das luzes
+  goldSoft: "#e7bd6f",
+  ink: "#152118",
 };
 
 interface Prod {
@@ -91,44 +94,87 @@ const LandingDestilado = () => {
     setReduceMotion(!!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
   }, []);
 
-  /* Scroll: nav sólido + parallax do hero + galeria horizontal */
+  /* Nav sólido ao rolar (leve, funciona com ou sem reduced-motion) */
   useEffect(() => {
-    let raf = 0;
-    const onScroll = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const y = window.scrollY || 0;
-        setNavSolid((prev) => (y > 60 ? (prev ? prev : true) : (prev ? false : prev)));
-
-        if (!reduceMotion) {
-          if (heroContentRef.current) {
-            const p = Math.min(y / (window.innerHeight || 1), 1);
-            heroContentRef.current.style.transform = `translate3d(0, ${y * 0.28}px, 0)`;
-            heroContentRef.current.style.opacity = String(Math.max(1 - p * 1.25, 0));
-          }
-          if (heroGlowRef.current) {
-            heroGlowRef.current.style.transform = `translate3d(0, ${y * 0.14}px, 0) scale(${1 + y * 0.0004})`;
-          }
-          const wrap = reelWrapRef.current, track = reelTrackRef.current;
-          if (wrap && track) {
-            const rect = wrap.getBoundingClientRect();
-            const vh = window.innerHeight || 1;
-            const total = wrap.offsetHeight - vh;
-            const scrolled = Math.min(Math.max(-rect.top, 0), Math.max(total, 0));
-            const progress = total > 0 ? scrolled / total : 0;
-            const maxX = Math.max(track.scrollWidth - window.innerWidth, 0);
-            track.style.transform = `translate3d(${-progress * maxX}px, 0, 0)`;
-          }
-        }
-      });
-    };
+    const onScroll = () => setNavSolid((prev) => {
+      const next = (window.scrollY || 0) > 60;
+      return prev === next ? prev : next;
+    });
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  /* Loop de animação com INÉRCIA (lerp) — movimento sedoso e profissional:
+     parallax do hero + galeria horizontal + cards que crescem no centro. */
+  useEffect(() => {
+    if (reduceMotion) return;
+    let raf = 0;
+    let running = true;
+    const cur = { heroY: 0, glowY: 0, reel: 0 };
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+    const frame = () => {
+      if (!running) return;
+      const y = window.scrollY || 0;
+      const vh = window.innerHeight || 1;
+      const vw = window.innerWidth || 1;
+
+      // alvos
+      const heroTarget = y * 0.32;
+      const glowTarget = y * 0.16;
+      let reelTarget = cur.reel;
+      const wrap = reelWrapRef.current, track = reelTrackRef.current;
+      if (wrap && track) {
+        const rect = wrap.getBoundingClientRect();
+        const total = wrap.offsetHeight - vh;
+        const scrolled = Math.min(Math.max(-rect.top, 0), Math.max(total, 0));
+        const progress = total > 0 ? scrolled / total : 0;
+        const maxX = Math.max(track.scrollWidth - vw, 0);
+        reelTarget = progress * maxX;
+      }
+
+      // suavização (inércia)
+      cur.heroY = lerp(cur.heroY, heroTarget, 0.085);
+      cur.glowY = lerp(cur.glowY, glowTarget, 0.085);
+      cur.reel = lerp(cur.reel, reelTarget, 0.10);
+
+      if (heroContentRef.current) {
+        const p = Math.min(y / vh, 1);
+        heroContentRef.current.style.transform = `translate3d(0, ${cur.heroY}px, 0)`;
+        heroContentRef.current.style.opacity = String(Math.max(1 - p * 1.1, 0));
+      }
+      if (heroGlowRef.current) {
+        heroGlowRef.current.style.transform = `translate3d(0, ${cur.glowY}px, 0)`;
+      }
+      if (track) {
+        track.style.transform = `translate3d(${-cur.reel}px, 0, 0)`;
+        // cada prato cresce/ilumina ao passar pelo centro da tela
+        const centerX = vw / 2;
+        const kids = track.children;
+        for (let i = 0; i < kids.length; i++) {
+          const card = kids[i] as HTMLElement;
+          const r = card.getBoundingClientRect();
+          if (r.right < -200 || r.left > vw + 200) continue; // fora da tela: pula
+          const d = Math.min(Math.abs(r.left + r.width / 2 - centerX) / vw, 1);
+          card.style.transform = `scale(${1 - d * 0.14})`;
+          card.style.opacity = String(Math.max(1 - d * 0.55, 0.35));
+        }
+      }
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+
+    const onVis = () => {
+      if (document.hidden) { running = false; cancelAnimationFrame(raf); }
+      else if (!running) { running = true; raf = requestAnimationFrame(frame); }
+    };
+    document.addEventListener("visibilitychange", onVis);
+
     return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
+      running = false;
       cancelAnimationFrame(raf);
+      document.removeEventListener("visibilitychange", onVis);
     };
   }, [reduceMotion, products.length]);
 
@@ -162,7 +208,7 @@ const LandingDestilado = () => {
           borderBottom: navSolid ? "1px solid rgba(201,162,75,0.18)" : "1px solid transparent",
         }}
       >
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
+        <div className={`mx-auto flex max-w-6xl items-center justify-between px-5 transition-all duration-500 ${navSolid ? "py-3" : "py-5"}`}>
           <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="flex items-center gap-3">
             {logo ? (
               <img src={logo} alt={ESTABLISHMENT.name} className="h-10 w-10 rounded-full object-cover" />
@@ -191,40 +237,49 @@ const LandingDestilado = () => {
       {/* ===== HERO ===== */}
       <header className="grain relative flex h-[100svh] min-h-[620px] items-center justify-center overflow-hidden"
         style={{ background: `radial-gradient(120% 90% at 50% -10%, ${C.greenSoft} 0%, ${C.green} 38%, ${C.greenDeep} 100%)` }}>
-        {/* brilho/luz de fundo */}
-        <div ref={heroGlowRef} className="pointer-events-none absolute inset-0"
-          style={{ background: `radial-gradient(50% 40% at 50% 30%, rgba(201,162,75,0.20) 0%, transparent 70%)` }} />
+        {/* foto real da fachada, com Ken Burns (deriva/zoom lento) */}
         {banner && (
-          <div className="pointer-events-none absolute inset-0 opacity-25"
-            style={{ backgroundImage: `url(${banner})`, backgroundSize: "cover", backgroundPosition: "center", filter: "saturate(0.8)" }} />
+          <>
+            <div className="db-kenburns pointer-events-none absolute inset-0"
+              style={{ backgroundImage: `url(${banner})`, backgroundSize: "cover", backgroundPosition: "center" }} />
+            {/* véu para legibilidade do texto sobre a foto */}
+            <div className="pointer-events-none absolute inset-0"
+              style={{ background: `linear-gradient(180deg, rgba(12,36,22,0.55) 0%, rgba(12,36,22,0.35) 40%, rgba(12,36,22,0.82) 100%)` }} />
+          </>
         )}
+        {/* brilho/luz âmbar de fundo */}
+        <div ref={heroGlowRef} className="pointer-events-none absolute inset-0"
+          style={{ background: `radial-gradient(46% 38% at 50% 32%, rgba(216,162,74,0.22) 0%, transparent 70%)` }} />
         {/* folhas flutuantes */}
         <Leaf className="db-float absolute left-[8%] top-[18%] h-16 w-16" style={{ color: "rgba(201,162,75,0.35)", ["--rot" as any]: "-18deg" }} />
         <Leaf className="db-float absolute right-[10%] top-[24%] h-20 w-20" style={{ color: "rgba(244,236,214,0.18)", ["--rot" as any]: "24deg", animationDelay: "1.5s" }} />
         <Leaf className="db-float absolute bottom-[16%] left-[16%] h-12 w-12" style={{ color: "rgba(244,236,214,0.14)", ["--rot" as any]: "8deg", animationDelay: "0.8s" }} />
 
         <div ref={heroContentRef} className="relative z-10 mx-auto max-w-3xl px-6 text-center">
-          {logo && <img src={logo} alt="" className="mx-auto mb-6 h-24 w-24 rounded-full object-cover ring-1 ring-white/20" />}
-          <p className="mb-5 text-[11px] font-semibold uppercase tracking-[0.42em]" style={{ color: C.gold }}>
+          {logo && (
+            <img src={logo} alt="" className="db-hero-in mx-auto mb-6 h-24 w-24 rounded-full object-cover ring-1 ring-white/20"
+              style={{ animationDelay: "0ms" }} />
+          )}
+          <p className="db-hero-in mb-5 text-[11px] font-semibold uppercase tracking-[0.42em]" style={{ color: C.gold, animationDelay: "120ms" }}>
             Cozinha · Boteco · Destilaria
           </p>
-          <h1 className="font-display text-5xl leading-[0.98] sm:text-7xl" style={{ color: C.cream }}>
+          <h1 className="db-hero-in font-display text-5xl leading-[0.98] sm:text-7xl" style={{ color: C.cream, animationDelay: "220ms" }}>
             {restaurant?.name || "Destilado Botequim"}
           </h1>
-          <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed sm:text-lg" style={{ color: "rgba(244,236,214,0.82)" }}>
+          <p className="db-hero-in mx-auto mt-6 max-w-xl text-base leading-relaxed sm:text-lg" style={{ color: "rgba(241,231,205,0.85)", animationDelay: "360ms" }}>
             Puxe uma cadeira. Aqui a brasa é lenta, o copo é cheio e a mesa é pra ficar.
             Comida de boteco de verdade, com alma e sem pressa.
           </p>
-          <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <div className="db-hero-in mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row" style={{ animationDelay: "500ms" }}>
             <button onClick={goOrder}
-              className="group flex items-center gap-2 rounded-full px-7 py-3.5 text-base font-semibold transition-transform hover:scale-[1.03]"
-              style={{ background: C.gold, color: C.greenDeep }}>
+              className="group flex items-center gap-2 rounded-full px-7 py-3.5 text-base font-semibold shadow-lg transition-transform hover:scale-[1.04]"
+              style={{ background: C.gold, color: C.greenDeep, boxShadow: "0 10px 30px -8px rgba(216,162,74,0.5)" }}>
               Fazer Pedido
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </button>
             <button onClick={goReserve}
-              className="rounded-full border px-7 py-3.5 text-base font-semibold transition-colors"
-              style={{ borderColor: "rgba(244,236,214,0.4)", color: C.cream }}>
+              className="rounded-full border px-7 py-3.5 text-base font-semibold backdrop-blur-sm transition-colors hover:bg-white/5"
+              style={{ borderColor: "rgba(241,231,205,0.45)", color: C.cream }}>
               Reservar Mesa
             </button>
           </div>
@@ -294,7 +349,7 @@ const LandingDestilado = () => {
           <Reveal>
             <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl" style={{ background: C.greenDeep }}>
               {banner ? (
-                <img src={banner} alt="Ambiente do Destilado Botequim" className="h-full w-full object-cover" />
+                <img src={banner} alt="Ambiente do Destilado Botequim" className="db-kenburns h-full w-full object-cover" />
               ) : (
                 <div className="grain flex h-full w-full items-center justify-center">
                   <Leaf className="h-24 w-24" style={{ color: "rgba(201,162,75,0.4)" }} />
@@ -401,7 +456,7 @@ const LandingDestilado = () => {
 function ReelCard({ product }: { product?: Prod }) {
   const price = product ? (product.promotional_price ?? product.price) : null;
   return (
-    <div className="w-[68vw] max-w-[340px] shrink-0 sm:w-[340px]">
+    <div className="w-[68vw] max-w-[340px] shrink-0 sm:w-[340px]" style={{ willChange: "transform, opacity" }}>
       <div className="relative aspect-[3/4] overflow-hidden rounded-2xl" style={{ background: "#16382a" }}>
         {product?.image_url ? (
           <img src={product.image_url} alt={product.name} className="h-full w-full object-cover transition-transform duration-700 hover:scale-105" />

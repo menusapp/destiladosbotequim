@@ -233,17 +233,37 @@
   font-optical-sizing: auto;
 }
 
-/* Reveal on scroll (usado com o hook useReveal) */
+/* Reveal on scroll (usado com o hook useReveal) — entrada suave com blur */
 .reveal {
   opacity: 0;
-  transform: translateY(28px);
-  transition: opacity 900ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 900ms cubic-bezier(0.16, 1, 0.3, 1);
-  will-change: opacity, transform;
+  transform: translateY(24px);
+  filter: blur(8px);
+  transition: opacity 1100ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 1100ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 1100ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform, filter;
 }
 .reveal.is-visible {
   opacity: 1;
   transform: none;
+  filter: blur(0);
+}
+
+/* Ken Burns — deriva/zoom lento em imagens de fundo */
+@keyframes dbKenBurns {
+  0% { transform: scale(1.08) translate3d(0, 0, 0); }
+  100% { transform: scale(1.18) translate3d(-1.5%, -2%, 0); }
+}
+.db-kenburns { animation: dbKenBurns 26s ease-in-out infinite alternate; }
+
+/* Intro do hero (uma vez, no load) */
+@keyframes dbHeroIn {
+  0% { opacity: 0; transform: translateY(26px); filter: blur(10px); }
+  100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+.db-hero-in {
+  opacity: 0;
+  animation: dbHeroIn 1200ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 /* Grão sutil de filme sobre fundos escuros */
@@ -270,6 +290,7 @@
 .db-scroll-cue { animation: dbScrollCue 2s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal { opacity: 1; transform: none; transition: none; }
-  .db-float, .db-scroll-cue { animation: none; }
+  .reveal { opacity: 1; transform: none; filter: none; transition: none; }
+  .db-float, .db-scroll-cue, .db-kenburns { animation: none; }
+  .db-hero-in { opacity: 1; animation: none; }
 }
