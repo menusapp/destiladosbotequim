@@ -371,7 +371,9 @@ const LandingDestilado = () => {
         <div className="mx-auto grid max-w-6xl items-center gap-12 md:grid-cols-2">
           <Reveal>
             <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl" style={{ background: C.greenDeep }}>
-              {banner ? (
+              {ambientPhoto ? (
+                <img src={ambientPhoto} alt="Fachada do Destilado Botequim" className="db-kenburns h-full w-full object-cover" />
+              ) : banner ? (
                 <img src={banner} alt="Ambiente do Destilado Botequim" className="db-kenburns h-full w-full object-cover" />
               ) : (
                 <div className="grain flex h-full w-full items-center justify-center">
