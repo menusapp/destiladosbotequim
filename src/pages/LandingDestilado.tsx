@@ -333,38 +333,35 @@ const LandingDestilado = () => {
         </div>
       </section>
 
-      {/* ===== GALERIA HORIZONTAL (pratos reais) ===== */}
-      {reduceMotion ? (
-        <section className="py-20" style={{ background: C.greenDeep }}>
-          <div className="mx-auto max-w-6xl px-6">
-            <h2 className="font-display text-4xl mb-8" style={{ color: C.cream }}>Da nossa cozinha</h2>
-            <div className="flex gap-5 overflow-x-auto pb-4 scrollbar-hide" style={{ scrollSnapType: "x mandatory" }}>
-              {(reelCards.length ? reelCards : Array.from({ length: 5 })).map((p: any, i) => (
-                <ReelCard key={p?.id || i} product={p} />
-              ))}
-            </div>
-          </div>
-        </section>
-      ) : (
-        <section ref={reelWrapRef} className="relative" style={{ height: reelHeight, background: C.greenDeep }}>
-          <div className="grain sticky top-0 flex h-[100svh] flex-col justify-center overflow-hidden">
-            <div className="mx-auto mb-10 w-full max-w-6xl px-6">
-              <Reveal>
+      {/* ===== GALERIA (pratos reais) ===== */}
+      <section className="relative overflow-hidden px-6 py-24 sm:py-28" style={{ background: C.greenDeep }}>
+        <div className="mx-auto max-w-6xl">
+          <div className="mb-12 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <Reveal>
+              <div>
                 <span className="text-[11px] font-semibold uppercase tracking-[0.4em]" style={{ color: C.gold }}>O balcão</span>
-                <h2 className="font-display text-4xl sm:text-6xl" style={{ color: C.cream }}>Da nossa cozinha</h2>
-              </Reveal>
-            </div>
-            <div ref={reelTrackRef} className="flex items-stretch gap-6 pl-[6vw] pr-[40vw] will-change-transform" style={{ width: "max-content" }}>
-              {(reelCards.length ? reelCards : Array.from({ length: 6 })).map((p: any, i) => (
-                <ReelCard key={p?.id || i} product={p} />
-              ))}
-            </div>
-            <p className="mx-auto mt-8 w-full max-w-6xl px-6 text-xs" style={{ color: "rgba(244,236,214,0.5)" }}>
-              role para ver o cardápio passar →
-            </p>
+                <h2 className="mt-3 font-display text-4xl sm:text-5xl" style={{ color: C.cream }}>Da nossa cozinha</h2>
+              </div>
+            </Reveal>
+            <Reveal delay={80}>
+              <button onClick={goOrder}
+                className="inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold"
+                style={{ borderColor: "rgba(216,162,74,0.5)", color: C.gold }}>
+                Ver cardápio completo <ArrowRight className="h-4 w-4" />
+              </button>
+            </Reveal>
           </div>
-        </section>
-      )}
+
+          <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+            {reelCards.map((p, i) => (
+              <Reveal key={p.id} delay={(i % 4) * 60}>
+                <ReelCard product={p} />
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
 
       {/* ===== AMBIENTE ===== */}
       <section className="relative overflow-hidden px-6 py-28" style={{ background: C.green }}>
