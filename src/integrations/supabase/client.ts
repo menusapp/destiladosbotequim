@@ -66,7 +66,10 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 export function applyRealtimeAuth(): void {
   try {
     const token = getSessionToken();
-    supabase.realtime.setAuth(token ?? SUPABASE_PUBLISHABLE_KEY);
+    // Com token (staff/CEO) → Realtime opera como authenticated. Sem token,
+    // passa `null` para o Realtime usar a apikey anônima configurada — NUNCA
+    // a chave publishable como access_token (não é um JWT e quebraria o RLS).
+    supabase.realtime.setAuth(token ?? null);
   } catch {
     // ignore
   }

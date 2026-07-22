@@ -257,12 +257,20 @@ AS $$
   WHERE id = p_payment_id AND restaurant_id = public.default_restaurant_id()
 $$;
 
--- Cartões salvos do cliente — exige CPF + telefone.
+-- Cartões salvos do cliente — exige CPF + telefone. Retorna APENAS colunas de
+-- exibição + o id (usado como saved_card_id na cobrança). NUNCA expõe os
+-- tokens do gateway (card_id, mp_customer_id, first_six_digits) — o edge
+-- function mercadopago-charge os resolve pelo id server-side.
 CREATE OR REPLACE FUNCTION public.get_saved_cards(p_cpf text, p_phone text)
-RETURNS SETOF public.customer_cards
+RETURNS TABLE(
+  id uuid, last_four_digits text, payment_method_id text,
+  expiration_month integer, expiration_year integer
+)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
-  SELECT * FROM public.customer_cards cc
+  SELECT cc.id, cc.last_four_digits, cc.payment_method_id,
+         cc.expiration_month, cc.expiration_year
+  FROM public.customer_cards cc
   WHERE cc.restaurant_id = public.default_restaurant_id()
     AND cc.customer_cpf = p_cpf
     AND regexp_replace(COALESCE(cc.customer_phone,''), '\D', '', 'g') = regexp_replace(COALESCE(p_phone,''), '\D', '', 'g')

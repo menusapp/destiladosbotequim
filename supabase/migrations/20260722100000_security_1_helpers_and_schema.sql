@@ -124,6 +124,12 @@ UPDATE public.customer_addresses
    SET restaurant_id = public.default_restaurant_id()
  WHERE restaurant_id IS NULL;
 
+-- DEFAULT no nível do banco: os inserts anônimos do checkout NÃO enviam
+-- restaurant_id. Sem este default, a coluna ficaria NULL e a política
+-- anon (restaurant_id = default_restaurant_id()) rejeitaria o insert.
+ALTER TABLE public.customer_addresses
+  ALTER COLUMN restaurant_id SET DEFAULT public.default_restaurant_id();
+
 CREATE INDEX IF NOT EXISTS idx_customer_addresses_cpf ON public.customer_addresses (customer_cpf);
 CREATE INDEX IF NOT EXISTS idx_customer_addresses_restaurant ON public.customer_addresses (restaurant_id);
 

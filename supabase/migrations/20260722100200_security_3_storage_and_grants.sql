@@ -12,6 +12,16 @@
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
+-- 0) Garante que os buckets de imagem sejam PÚBLICOS (renderização via CDN).
+--    Ao remover a política de SELECT anônima abaixo, a leitura das imagens
+--    continua funcionando SOMENTE se o bucket for público. Idempotente.
+-- ---------------------------------------------------------------------
+INSERT INTO storage.buckets (id, name, public) VALUES
+  ('product-images', 'product-images', true),
+  ('table-images', 'table-images', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- ---------------------------------------------------------------------
 -- 1) STORAGE — remove políticas amplas dos buckets sensíveis/públicos.
 --    Drop por bucket (via texto da expressão), independente do nome.
 -- ---------------------------------------------------------------------

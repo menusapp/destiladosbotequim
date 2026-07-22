@@ -113,8 +113,9 @@ a leitura de PII do cliente (isso é o Estágio B).
    ```bash
    supabase functions deploy issue-session-token
    ```
-   Garanta que ela é **pública** (sem exigir JWT para ser chamada) — é um endpoint de login.
-   Se seu projeto exige `verify_jwt=false`, configure no dashboard da function.
+   Ela precisa ser **pública** (é um endpoint de login, chamado antes de existir sessão).
+   Isso já está configurado em `supabase/config.toml` (`verify_jwt = false`). Se você faz
+   deploy pelo Dashboard, confirme que "Verify JWT" está **desligado** para esta function.
 3. **Deploy do frontend** (a branch inteira).
 4. **Aplique as migrations 1 a 4** (nessa ordem). A Parte 4 (RPCs) é inerte até o frontend
    chamá-la — pode aplicar já. **NÃO aplique a Parte 5 ainda.**

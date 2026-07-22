@@ -1,1 +1,5 @@
 project_id = "ksscrxwvslddfqxjxzlo"
+
+# Endpoint de login (chamado ANTES de existir sessão) — não pode exigir JWT.
+[functions.issue-session-token]
+verify_jwt = false
