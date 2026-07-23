@@ -214,7 +214,7 @@ const ProductCard = memo(({ product, onEdit, onToggleAvailable, onDuplicate, onD
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,image/webp,.webp,.jpg,.jpeg,.png,.gif"
             className="hidden"
             onChange={handlePhotoUpload}
           />

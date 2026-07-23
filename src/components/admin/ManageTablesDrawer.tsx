@@ -216,7 +216,7 @@ export const ManageTablesDrawer = ({ restaurantId, open, onOpenChange, onTablesC
 
                 <div>
                   <Label className="text-xs">Foto (opcional)</Label>
-                  <Input type="file" accept="image/*" onChange={e => setImageFile(e.target.files?.[0] || null)} className="text-xs" />
+                  <Input type="file" accept="image/*,image/webp,.webp,.jpg,.jpeg,.png,.gif" onChange={e => setImageFile(e.target.files?.[0] || null)} className="text-xs" />
                 </div>
 
                 <Button onClick={handleSave} disabled={saving} className="w-full" size="sm">

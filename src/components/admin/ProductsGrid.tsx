@@ -934,7 +934,7 @@ const ProductsGrid = ({ restaurantId, isRestaurantOpen, onOpenDigitizer, onOpenI
                         {productImageUrl && !productImage && (
                           <img src={productImageUrl} alt="Preview" className="w-full h-40 object-cover rounded-lg border" />
                         )}
-                        <Input id="product-image" type="file" accept="image/*" onChange={(e) => setProductImage(e.target.files?.[0] || null)} />
+                        <Input id="product-image" type="file" accept="image/*,image/webp,.webp,.jpg,.jpeg,.png,.gif" onChange={(e) => setProductImage(e.target.files?.[0] || null)} />
                       </CardContent>
                     </Card>
                   </div>
