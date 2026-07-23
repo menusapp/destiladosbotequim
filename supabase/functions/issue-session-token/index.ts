@@ -34,6 +34,10 @@ function json(status: number, body: unknown) {
   });
 }
 
+// Erro específico de configuração (secret ausente) — tratado como 200 com
+// mensagem clara para o usuário, em vez de um 500 genérico.
+class ConfigError extends Error {}
+
 // Importa o JWT secret (HS256) do projeto para uso com a Web Crypto API.
 async function getSigningKey(): Promise<CryptoKey> {
   const secret =
@@ -41,8 +45,8 @@ async function getSigningKey(): Promise<CryptoKey> {
     Deno.env.get("SUPABASE_JWT_SECRET") ??
     "";
   if (!secret) {
-    throw new Error(
-      "JWT_SECRET não configurado na function (copie o 'JWT Secret' do projeto).",
+    throw new ConfigError(
+      "Login indisponível: o segredo de assinatura (JWT_SECRET) não está configurado nesta função. Configure o secret JWT_SECRET com o JWT Secret do projeto e faça deploy novamente.",
     );
   }
   return await crypto.subtle.importKey(
@@ -142,6 +146,9 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("[issue-session-token] fatal", err);
-    return json(500, { error: (err as Error).message || "Erro interno" });
+    const message = (err as Error).message || "Erro interno";
+    // Erros de configuração e demais falhas voltam como 200 com mensagem,
+    // para o frontend exibir o motivo em vez do genérico "non-2xx".
+    return json(200, { error: message });
   }
 });
