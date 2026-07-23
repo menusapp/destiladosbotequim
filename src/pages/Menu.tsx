@@ -813,14 +813,8 @@ const Menu = () => {
       }
 
       // Contar comandas ativas na mesa para atualizar occupied_by
-      // TODO(security): needs RPC - no RPC exists yet to count active comandas per table
-      const { count: activeCount } = await supabase
-        .from("comandas")
-        .select("*", { count: "exact", head: true })
-        .eq("table_id", tableData.id)
-        .eq("status", "active");
-
-      const clientCount = activeCount || 1;
+      const { data: activeCountRpc } = await (supabase as any).rpc('count_active_comandas_for_table', { p_table_id: tableData.id });
+      const clientCount = Number(activeCountRpc) || 1;
       const occupiedByText = clientCount === 1 
         ? `${finalName}` 
         : `${clientCount} clientes`;
