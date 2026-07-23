@@ -87,7 +87,7 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
       const [sessionsRes, abandonedRes, potentialRes] = await Promise.all([
         supabase.from("customer_sessions" as any).select("id", { count: "exact", head: true }).eq("restaurant_id", restaurantId).gte("created_at", todayISO),
         supabase.from("customer_sessions" as any).select("id, cart_value").eq("restaurant_id", restaurantId).eq("status", "abandoned").gte("abandoned_at", todayISO),
-        supabase.from("customer_sessions" as any).select("id, cart_value").eq("restaurant_id", restaurantId).in("status", ["cart_added", "checkout_started"]).lt("last_activity", thirtyMinAgo),
+        supabase.from("customer_sessions" as any).select("id, cart_value").eq("restaurant_id", restaurantId).in("status", ["cart_added", "checkout_started"]).lt("last_activity", thirtyMinAgo).gte("created_at", todayISO),
       ]);
 
       const totalSessions = (sessionsRes as any).count || 0;

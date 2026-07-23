@@ -255,9 +255,12 @@ export function CampaignsList({ restaurantId }: CampaignsListProps) {
 
     const { delay_value, delay_unit } = campaign.rule;
     const unitLabel = {
+      seconds: delay_value === 1 ? "segundo" : "segundos",
       minutes: delay_value === 1 ? "minuto" : "minutos",
       hours: delay_value === 1 ? "hora" : "horas",
       days: delay_value === 1 ? "dia" : "dias",
+      weeks: delay_value === 1 ? "semana" : "semanas",
+      months: delay_value === 1 ? "mês" : "meses",
     }[delay_unit] || delay_unit;
 
     return `${delay_value} ${unitLabel} depois`;

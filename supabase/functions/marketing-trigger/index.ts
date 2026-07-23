@@ -177,7 +177,8 @@ Deno.serve(async (req) => {
         if (matches) {
           // Check order type filter
           const orderType = order.order_type || 'local';
-          const isOnlineOrder = orderType === 'delivery';
+          // 'delivery' e 'balcao'/PDV contam como venda "online" para o filtro.
+          const isOnlineOrder = orderType === 'delivery' || orderType === 'balcao';
           const filterType = rule.order_type_filter || 'all';
 
           if (filterType === 'online' && !isOnlineOrder) {
@@ -211,6 +212,10 @@ Deno.serve(async (req) => {
               break;
             case "months":
               scheduledFor.setMonth(scheduledFor.getMonth() + rule.delay_value);
+              break;
+            default:
+              // Unidade desconhecida → trata como minutos (evita envio imediato inesperado).
+              scheduledFor.setMinutes(scheduledFor.getMinutes() + (rule.delay_value || 0));
               break;
           }
 
@@ -292,9 +297,14 @@ Deno.serve(async (req) => {
             }
           }
 
+          // Nome do cliente pode ser null; usa "cliente" como fallback para
+          // não vazar "null" na mensagem NEM violar o NOT NULL da coluna
+          // customer_name (que abortaria o INSERT de TODO o lote).
+          const safeCustomerName = order.customer_name || "cliente";
+
           // Format the message
           let messageText = rule.message_template
-            .replace(/{nome}/g, order.customer_name)
+            .replace(/{nome}/g, safeCustomerName)
             .replace(/{cupom}/g, couponCode || "")
             .replace(/{desconto}/g, discountText)
             .replace(/{produto}/g, matchedProductName)
@@ -308,7 +318,7 @@ Deno.serve(async (req) => {
             order_id: orderId,
             restaurant_id: restaurantId,
             customer_cpf: order.customer_cpf,
-            customer_name: order.customer_name,
+            customer_name: safeCustomerName,
             customer_phone: customerPhone,
             coupon_code: couponCode,
             message_text: messageText,

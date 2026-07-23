@@ -81,22 +81,31 @@ export function useSessionTracking(restaurantId: string | undefined, restaurantS
         return sum + (price + extrasTotal) * item.quantity;
       }, 0);
 
-      // Guarda o id (hash único) de cada produto além do nome, para permitir
-      // rastreabilidade e remarketing segmentado por produto específico.
+      // Guarda o id (hash único) e o código PDV de cada produto além do nome,
+      // para rastreabilidade e remarketing segmentado por produto específico.
       const cartSnapshot = cart.map((item) => ({
         id: item.product.id,
+        pdv_code: (item.product as any).pdv_code ?? null,
         name: item.product.name,
         qty: item.quantity,
         price: item.product.promotional_price ?? item.product.price,
       }));
 
-      lastStatus.current = "cart_added";
-
-      upsertSession({
-        status: "cart_added",
+      const payload: Record<string, any> = {
         cart_items: cartSnapshot,
         cart_value: Math.round(cartValue * 100) / 100,
-      });
+      };
+
+      // Não regride o funil: se o cliente já iniciou o checkout (ou concluiu),
+      // apenas atualiza o carrinho, sem voltar o status para "cart_added".
+      const advanced =
+        lastStatus.current === "checkout_started" || lastStatus.current === "completed";
+      if (!advanced) {
+        payload.status = "cart_added";
+        lastStatus.current = "cart_added";
+      }
+
+      upsertSession(payload);
     },
     [restaurantId, upsertSession]
   );
