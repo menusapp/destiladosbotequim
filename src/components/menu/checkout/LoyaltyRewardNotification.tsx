@@ -113,29 +113,33 @@ export const LoyaltyRewardNotification = ({
   const fetchCustomerCoupons = async () => {
     setLoadingCoupons(true);
     try {
-      // Fetch coupon codes from marketing messages sent to this customer
-      const { data: messages } = await supabase
-        .from("marketing_scheduled_messages")
-        .select("coupon_code")
-        .eq("restaurant_id", restaurantId)
-        .eq("customer_cpf", customerCPF)
-        .eq("status", "sent")
-        .not("coupon_code", "is", null);
+      // Fetch coupon codes assigned to this customer via RPC
+      const { data: couponCodeRows } = await (supabase as any).rpc("get_customer_coupons", {
+        p_cpf: customerCPF,
+      });
 
-      const couponCodes = [...new Set(messages?.map(m => m.coupon_code).filter(Boolean) || [])];
+      const couponCodes = [...new Set((couponCodeRows || []).map((m: any) => m.coupon_code).filter(Boolean))];
 
       if (couponCodes.length === 0) {
         setCustomerCoupons([]);
         return;
       }
 
-      // Fetch valid coupons
-      const { data: coupons } = await supabase
-        .from("coupons")
-        .select("id, code, discount_type, discount_value, valid_until, min_order_value")
-        .eq("restaurant_id", restaurantId)
-        .eq("is_active", true)
-        .in("code", couponCodes);
+      // Fetch valid coupons via RPC, one at a time, then filter by restaurant/active
+      const couponResults = await Promise.all(
+        couponCodes.map((code) => (supabase as any).rpc("validate_coupon", { p_code: code }))
+      );
+      const coupons = couponResults
+        .map((r) => (Array.isArray(r.data) ? r.data[0] : r.data))
+        .filter((c: any) => c && c.restaurant_id === restaurantId && c.is_active)
+        .map((c: any) => ({
+          id: c.id,
+          code: c.code,
+          discount_type: c.discount_type,
+          discount_value: c.discount_value,
+          valid_until: c.valid_until,
+          min_order_value: c.min_order_value,
+        }));
 
       // Filter out expired coupons
       const validCoupons = (coupons || []).filter(c => {
@@ -178,16 +182,24 @@ export const LoyaltyRewardNotification = ({
       const programActivatedAt = program.activated_at || new Date(0).toISOString();
 
       // Fetch ALL customer orders since program activation
-      const { data: ordersData } = await supabase
-        .from("orders")
-        .select(`
-          id, created_at,
-          order_items(price_at_order, quantity, order_item_extras(price_at_order))
-        `)
-        .eq("restaurant_id", restaurantId)
-        .eq("customer_cpf", customerCPF)
-        .in("status", ["delivered", "picked_up", "completed"])
-        .gte("created_at", programActivatedAt);
+      const { data: allCustomerOrders } = await (supabase as any).rpc("get_customer_orders", {
+        p_cpf: customerCPF,
+        p_phone: null,
+      });
+      const eligibleOrders = (allCustomerOrders || []).filter(
+        (o: any) =>
+          o.restaurant_id === restaurantId &&
+          ["delivered", "picked_up", "completed"].includes(o.status) &&
+          new Date(o.created_at) >= new Date(programActivatedAt)
+      );
+      const ordersData = await Promise.all(
+        eligibleOrders.map(async (o: any) => {
+          const { data: details } = await (supabase as any).rpc("get_order_details", {
+            p_order_id: o.id,
+          });
+          return details || o;
+        })
+      );
 
       // Calculate progress from baseline
       let purchase_count = 0;

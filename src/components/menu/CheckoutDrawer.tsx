@@ -180,12 +180,10 @@ export const CheckoutDrawer = ({
 
       // PRIORIDADE: Buscar telefone do cadastro do cliente (fonte da verdade para WhatsApp)
       let phoneToUse = customerData.phone;
-      const { data: customerRecord } = await supabase
-        .from("customers")
-        .select("phone")
-        .eq("cpf", customerData.cpf)
-        .eq("restaurant_id", restaurant.id)
-        .maybeSingle();
+      const { data: customerRecordRows } = await (supabase as any).rpc("get_customer_by_cpf", {
+        p_cpf: customerData.cpf,
+      });
+      const customerRecord = Array.isArray(customerRecordRows) ? customerRecordRows[0] : customerRecordRows;
       
       if (customerRecord?.phone) {
         phoneToUse = customerRecord.phone;
@@ -818,14 +816,11 @@ export const CheckoutDrawer = ({
   };
 
   const fetchLoyaltyPoints = async (cpf: string) => {
-    const { data } = await supabase
-      .from("loyalty_points")
-      .select("points_balance")
-      .eq("customer_cpf", cpf)
-      .eq("restaurant_id", restaurant.id)
-      .single();
+    const { data } = await (supabase as any).rpc("get_loyalty_balance", {
+      p_cpf: cpf,
+    });
 
-    setLoyaltyPoints(data?.points_balance || 0);
+    setLoyaltyPoints((data as number) || 0);
   };
 
   if (mode === "local") {

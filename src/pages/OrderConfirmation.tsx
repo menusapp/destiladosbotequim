@@ -116,28 +116,21 @@ export default function OrderConfirmation() {
 
   useEffect(() => {
     fetchOrderDetails();
-    subscribeToOrderUpdates();
+    const interval = setInterval(() => {
+      pollOrderUpdates();
+    }, 15000);
+    return () => clearInterval(interval);
   }, [orderId]);
 
   const fetchOrderDetails = async () => {
     try {
-      const { data: orderData, error: orderError } = await supabase
-        .from("orders")
-        .select(`
-          *,
-          order_items (
-            id,
-            quantity,
-            price_at_order,
-            notes,
-            products (name),
-            order_item_extras (price_at_order, extra_name, product_extras(name))
-          )
-        `)
-        .eq("id", orderId)
-        .single();
+      const { data: orderData, error: orderError } = await (supabase as any).rpc(
+        "get_order_details",
+        { p_order_id: orderId }
+      );
 
       if (orderError) throw orderError;
+      if (!orderData) throw new Error("Order not found");
       setOrder(orderData as any);
 
       // Buscar dados do restaurante usando restaurant_id direto do pedido
@@ -191,77 +184,51 @@ export default function OrderConfirmation() {
     setHasReviewed(!!data);
   };
 
-  const subscribeToOrderUpdates = () => {
-    const channel = supabase
-      .channel(`order-${orderId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "orders",
-          filter: `id=eq.${orderId}`,
-        },
-        async (payload) => {
-          const newStatus = (payload.new as any).status;
-          const deliveryType = (payload.new as any).delivery_type;
+  const pollOrderUpdates = async () => {
+    if (!orderId) return;
+    const previousStatus = order?.status;
 
-          // Re-fetch full order with relations instead of using incomplete payload
-          const { data: fullOrder } = await supabase
-            .from("orders")
-            .select(`
-              *,
-              order_items (
-                id,
-                quantity,
-                price_at_order,
-                notes,
-                products (name),
-                order_item_extras (price_at_order, extra_name, product_extras(name))
-              )
-            `)
-            .eq("id", orderId)
-            .single();
+    const { data: fullOrder } = await (supabase as any).rpc("get_order_details", {
+      p_order_id: orderId,
+    });
 
-          if (fullOrder) {
-            setOrder(fullOrder as any);
-          }
+    if (!fullOrder) return;
 
-          // Notificações de mudança de status
-          if (newStatus === "accepted") {
-            toast.success("Seu pedido foi aceito e está em preparo! 🎉");
-          } else if (newStatus === "out_for_delivery") {
-            toast.success(
-              deliveryType === "pickup" 
-                ? "Seu pedido está pronto para retirada! 📦" 
-                : "Seu pedido saiu para entrega! 🚚"
-            );
-          } else if (newStatus === "delivered") {
-            toast.success("Pedido entregue! Bom apetite! 🎉");
-            setTimeout(async () => {
-              await checkExistingReview();
-              if (!hasReviewed) {
-                setShowReview(true);
-              }
-            }, 2000);
-          } else if (newStatus === "picked_up") {
-            toast.success("Pedido retirado! Bom apetite! 🎉");
-            setTimeout(async () => {
-              await checkExistingReview();
-              if (!hasReviewed) {
-                setShowReview(true);
-              }
-            }, 2000);
-          } else if (newStatus === "cancelled") {
-            toast.error("Seu pedido foi cancelado 😔");
-          }
+    const newStatus = fullOrder.status;
+    const deliveryType = fullOrder.delivery_type;
+
+    setOrder(fullOrder as any);
+
+    if (newStatus === previousStatus) return;
+
+    // Notificações de mudança de status
+    if (newStatus === "accepted") {
+      toast.success("Seu pedido foi aceito e está em preparo! 🎉");
+    } else if (newStatus === "out_for_delivery") {
+      toast.success(
+        deliveryType === "pickup" 
+          ? "Seu pedido está pronto para retirada! 📦" 
+          : "Seu pedido saiu para entrega! 🚚"
+      );
+    } else if (newStatus === "delivered") {
+      toast.success("Pedido entregue! Bom apetite! 🎉");
+      setTimeout(async () => {
+        await checkExistingReview();
+        if (!hasReviewed) {
+          setShowReview(true);
         }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      }, 2000);
+    } else if (newStatus === "picked_up") {
+      toast.success("Pedido retirado! Bom apetite! 🎉");
+      setTimeout(async () => {
+        await checkExistingReview();
+        if (!hasReviewed) {
+          setShowReview(true);
+        }
+      }, 2000);
+    } else if (newStatus === "cancelled") {
+      toast.error("Seu pedido foi cancelado 😔");
+    }
   };
 
   const calculateSubtotal = () => {

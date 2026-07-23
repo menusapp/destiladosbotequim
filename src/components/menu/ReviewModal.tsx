@@ -42,13 +42,8 @@ export const ReviewModal = ({
       // Verificar se a bill ainda existe (pode ter sido deletada)
       let validBillId = null;
       if (billId) {
-        const { data: billExists } = await supabase
-          .from("bills")
-          .select("id")
-          .eq("id", billId)
-          .maybeSingle();
-        
-        validBillId = billExists?.id || null;
+        const { data: existingId } = await (supabase as any).rpc('check_bill_exists', { p_bill_id: billId });
+        validBillId = existingId || null;
       }
 
       const { error } = await supabase.from("restaurant_reviews").insert({

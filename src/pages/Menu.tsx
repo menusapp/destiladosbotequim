@@ -258,12 +258,14 @@ const Menu = () => {
       // Verificar se a COMANDA ESPECÍFICA DO CLIENTE foi fechada (não da mesa toda!)
       // Isso evita que pagar uma comanda afete outras comandas na mesma mesa
       if (comandaId) {
-        // Verificar se a comanda do cliente está fechada
-        const { data: clientComanda } = await supabase
-          .from("comandas")
-          .select("status")
-          .eq("id", comandaId)
-          .maybeSingle();
+        // Verificar se a comanda do cliente está fechada via RPC
+        const { data: comandaRows } = await (supabase as any).rpc("get_comanda_status", {
+          p_table_id: currentTableId,
+          p_cpf: currentCustomer.cpf,
+        });
+        const clientComanda = (Array.isArray(comandaRows) ? comandaRows : [comandaRows]).find(
+          (c: any) => c?.id === comandaId
+        );
         
         if (clientComanda?.status === "closed") {
           setHasOpenComanda(false);
@@ -273,14 +275,8 @@ const Menu = () => {
         }
         
         // Verificar se existe bill paga DESTA COMANDA específica
-        const { data: clientPaidBill } = await supabase
-          .from("bills")
-          .select("id")
-          .eq("comanda_id", comandaId)
-          .eq("status", "paid")
-          .limit(1);
-        
-        if (clientPaidBill && clientPaidBill.length > 0) {
+        const { data: paidBillId } = await (supabase as any).rpc('get_paid_bill_for_comanda', { p_comanda_id: comandaId });
+        if (paidBillId) {
           setHasOpenComanda(false);
           setComandaTotal(cartTotal);
           setComandaStatus("");
@@ -288,54 +284,17 @@ const Menu = () => {
         }
       }
 
-      // Buscar apenas pedidos do cliente atual (sessão atual) usando comanda_id se disponível
-      let ordersQuery = supabase
-        .from("orders")
-        .select(`
-          id,
-          status,
-          customer_name,
-          customer_cpf,
-          order_items (
-            quantity,
-            price_at_order,
-            order_item_extras (
-              price_at_order
-            )
-          )
-        `)
-        .eq("table_id", currentTableId)
-        .in("status", ["pending", "accepted", "preparing", "ready"]);
-      
-      // Filtrar por comanda_id se disponível (mais preciso), senão por CPF
-      if (comandaId) {
-        ordersQuery = ordersQuery.eq("comanda_id", comandaId);
-      } else {
-        ordersQuery = ordersQuery
-          .eq("customer_name", currentCustomer.name)
-          .eq("customer_cpf", currentCustomer.cpf);
-      }
-      
-      const { data: orders, error } = await ordersQuery;
+      // Buscar total agregado dos pedidos abertos do cliente atual via RPC segura
+      const { data: ordersTotalRpc } = await (supabase as any).rpc('get_table_pending_orders_total', {
+        p_table_id: currentTableId,
+        p_comanda_id: comandaId || null,
+        p_customer_cpf: currentCustomer.cpf,
+        p_customer_name: currentCustomer.name,
+      });
+      const ordersTotal = Number(ordersTotalRpc) || 0;
 
-      if (error) throw error;
-
-      // Calcular total dos pedidos já enviados
-      let ordersTotal = 0;
-      if (orders && orders.length > 0) {
+      if (ordersTotal > 0) {
         setHasOpenComanda(true);
-        
-        orders.forEach((order: any) => {
-          order.order_items?.forEach((item: any) => {
-            const extrasSum = item.order_item_extras?.reduce((sum: number, extra: any) => sum + extra.price_at_order, 0) || 0;
-            const itemTotal = (item.price_at_order + extrasSum) * item.quantity;
-            ordersTotal += itemTotal;
-          });
-        });
-        
-        // Pegar status do pedido mais recente
-        const latestOrder = orders[orders.length - 1];
-        setComandaStatus(latestOrder.status);
       } else {
         setHasOpenComanda(false);
         setComandaStatus("");
@@ -476,92 +435,8 @@ const Menu = () => {
         
         // Silenciado para não atrapalhar cliente
       })
-      // 🔔 Listener de pedidos com notificações de status (usando refs para evitar stale closures)
-      .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'orders',
-        filter: `restaurant_id=eq.${restaurantId}`
-      }, (payload) => {
-        const order = payload.new as any;
-        const oldOrder = payload.old as any;
-        
-        // Usar refs para obter valores atualizados
-        const currentTableId = tableIdRef.current;
-        const currentCustomer = customerInfoRef.current;
-        
-        
-        // Verificar se é pedido deste cliente nesta mesa
-        if (currentTableId && order.table_id === currentTableId && currentCustomer) {
-          const cleanCPF = currentCustomer.cpf?.replace(/\D/g, '');
-          
-          if (order.customer_cpf === cleanCPF || order.customer_cpf === currentCustomer.cpf) {
-            // Notificar mudança de status apenas se mudou
-            // Silenciado - notificações de status removidas do cardápio do cliente
-          }
-        }
-        
-        // Atualizar dados da comanda usando ref
-        if (currentTableId) checkOpenComanda(currentTableId, cart);
-      })
-      // 🔔 Listener de INSERT em pedidos (usando ref)
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'orders',
-        filter: `restaurant_id=eq.${restaurantId}`
-      }, () => {
-        const currentTableId = tableIdRef.current;
-        if (currentTableId) checkOpenComanda(currentTableId, cart);
-      })
-      // 💳 Listener de contas (bills) UPDATE para detectar pagamento (usando ref)
-      // Nota: bills não tem restaurant_id; filtragem por mesa do cliente é feita no callback
-      .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'bills'
-      }, (payload) => {
-        const bill = payload.new as any;
-        const oldBill = payload.old as any;
-        
-        const currentTableId = tableIdRef.current;
-        
-        // Verificar se a conta foi paga e pertence à mesa atual E à comanda do cliente
-        if (currentTableId && bill.table_id === currentTableId) {
-          // Filtrar por comanda_id para isolamento entre clientes na mesma mesa
-          const myComandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
-          const billBelongsToMe = !myComandaId || bill.comanda_id === myComandaId;
-          
-          if (billBelongsToMe && bill.status === 'paid' && oldBill?.status !== 'paid') {
-            
-            setReviewBillId(bill.id);
-            setReviewModalOpen(true);
-          }
-        }
-      })
-      // 💳 Listener de contas (bills) INSERT para detectar pagamento direto pelo PDV (usando ref)
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'bills'
-      }, (payload) => {
-        const bill = payload.new as any;
-        
-        const currentTableId = tableIdRef.current;
-        
-        // Quando garçom paga pelo PDV sem cliente pedir conta, INSERT já vem com status='paid'
-        if (currentTableId && bill.table_id === currentTableId && bill.status === 'paid') {
-          // Filtrar por comanda_id para isolamento entre clientes na mesma mesa
-          const myComandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
-          const billBelongsToMe = !myComandaId || bill.comanda_id === myComandaId;
-          
-          if (billBelongsToMe) {
-            
-            setReviewBillId(bill.id);
-            setReviewModalOpen(true);
-          }
-        }
-      })
+      // NOTE: orders/bills postgres_changes listeners removed (locked tables).
+      // Replaced by 15s polling of get_comanda_status in a dedicated useEffect below.
       // 🚪 Listener de mesa para detectar esvaziamento forçado (admin)
       .on('postgres_changes', { 
         event: 'UPDATE', 
@@ -605,6 +480,34 @@ const Menu = () => {
       supabase.removeChannel(channel); 
     };
   }, [fetchData, restaurantSlug, tableNumber, restaurant?.id]);
+
+  // 🔁 Polling (15s) de status de comanda/pedidos/conta - substitui realtime em orders/bills
+  useEffect(() => {
+    if (!restaurant?.id) return;
+    const interval = setInterval(async () => {
+      const currentTableId = tableIdRef.current;
+      const currentCustomer = customerInfoRef.current;
+      if (!currentTableId || !currentCustomer) return;
+
+      // Atualiza dados de comanda/pedidos
+      checkOpenComanda(currentTableId, cart);
+
+      // Verificar status da comanda para detectar fechamento (pagamento)
+      const { data: comandaRows } = await (supabase as any).rpc("get_comanda_status", {
+        p_table_id: currentTableId,
+        p_cpf: currentCustomer.cpf,
+      });
+      const myComandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+      const myComanda = (Array.isArray(comandaRows) ? comandaRows : [comandaRows]).find(
+        (c: any) => c?.id === myComandaId
+      );
+      if (myComanda?.status === "closed" && !reviewModalOpen) {
+        setReviewModalOpen(true);
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [restaurant?.id, tableNumber, cart, checkOpenComanda, reviewModalOpen]);
 
   // 🔒 Revalidar sessão ao voltar do background (visibilitychange + focus)
   useEffect(() => {
@@ -826,12 +729,8 @@ const Menu = () => {
 
     try {
       // Check if customer exists in database - use saved name, ignore typed name
-      const { data: existingCustomer } = await supabase
-        .from("customers")
-        .select("name, phone")
-        .eq("restaurant_id", restaurant.id)
-        .eq("cpf", cleanCpf)
-        .maybeSingle();
+      const { data: customerRows } = await (supabase as any).rpc("get_customer_by_cpf", { p_cpf: cleanCpf });
+      const existingCustomer = Array.isArray(customerRows) ? customerRows[0] : customerRows;
       
       const finalName = existingCustomer ? existingCustomer.name : name;
       const finalPhone = existingCustomer?.phone || phone;
@@ -879,14 +778,13 @@ const Menu = () => {
       }
       
 
-      // Verificar se este cliente já tem comanda ativa nesta mesa
-      const { data: existingComanda } = await supabase
-        .from("comandas")
-        .select("id")
-        .eq("table_id", tableData.id)
-        .eq("customer_cpf", cleanCpf)
-        .eq("status", "active")
-        .maybeSingle();
+      // Verificar se este cliente já tem comanda ativa nesta mesa via RPC
+      const { data: comandaStatusRows } = await (supabase as any).rpc("get_comanda_status", {
+        p_table_id: tableData.id,
+        p_cpf: cleanCpf,
+      });
+      const comandaStatusRow = Array.isArray(comandaStatusRows) ? comandaStatusRows[0] : comandaStatusRows;
+      const existingComanda = comandaStatusRow?.status === "active" ? { id: comandaStatusRow.id } : null;
 
       let comandaId: string | undefined;
 
@@ -915,13 +813,8 @@ const Menu = () => {
       }
 
       // Contar comandas ativas na mesa para atualizar occupied_by
-      const { count: activeCount } = await supabase
-        .from("comandas")
-        .select("*", { count: "exact", head: true })
-        .eq("table_id", tableData.id)
-        .eq("status", "active");
-
-      const clientCount = activeCount || 1;
+      const { data: activeCountRpc } = await (supabase as any).rpc('count_active_comandas_for_table', { p_table_id: tableData.id });
+      const clientCount = Number(activeCountRpc) || 1;
       const occupiedByText = clientCount === 1 
         ? `${finalName}` 
         : `${clientCount} clientes`;

@@ -35,13 +35,12 @@ export const CouponInput = forwardRef<CouponInputRef, CouponInputProps>(({
     setValidating(true);
 
     try {
-      const { data, error } = await supabase
-        .from("coupons")
-        .select("*")
-        .eq("code", codeToValidate.toUpperCase())
-        .eq("restaurant_id", restaurantId)
-        .eq("is_active", true)
-        .single();
+      const { data: couponRows, error } = await (supabase as any).rpc("validate_coupon", {
+        p_code: codeToValidate.toUpperCase(),
+      });
+      const data = Array.isArray(couponRows)
+        ? couponRows.find((c: any) => c.restaurant_id === restaurantId && c.is_active) || couponRows[0]
+        : couponRows;
 
       if (error || !data) {
         toast.error("Cupom inválido");

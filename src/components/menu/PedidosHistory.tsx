@@ -35,51 +35,42 @@ export const PedidosHistory = ({
   useEffect(() => {
     fetchOrders();
 
-    // Realtime subscription
-    const channel = supabase
-      .channel("customer-orders")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "orders",
-          filter: `customer_cpf=eq.${customerCPF}`,
-        },
-        () => {
-          fetchOrders();
-        }
-      )
-      .subscribe();
+    // Poll for updates instead of realtime subscription
+    const interval = setInterval(() => {
+      fetchOrders();
+    }, 15000);
 
     return () => {
-      supabase.removeChannel(channel);
+      clearInterval(interval);
     };
   }, [customerCPF, restaurantId]);
 
   const fetchOrders = async () => {
     try {
-      const { data, error } = await supabase
-        .from("orders")
-        .select(
-          `
-          *,
-          order_items(
-            *,
-            products(name, price, id, category_id),
-            order_item_extras(
-              *,
-              product_extras(name, price, id)
-            )
-          )
-        `
-        )
-        .eq("customer_cpf", customerCPF)
-        .eq("restaurant_id", restaurantId)
-        .eq("order_type", "delivery")
-        .order("created_at", { ascending: false });
+      const { data: rpcData, error } = await (supabase as any).rpc("get_customer_orders", {
+        p_cpf: customerCPF,
+        p_phone: null,
+      });
 
       if (error) throw error;
+
+      // Filter for this restaurant + delivery orders, then fetch full details
+      // (with nested items/extras) per order via get_order_details.
+      const filteredOrders = (rpcData || []).filter(
+        (o: any) => o.restaurant_id === restaurantId && o.order_type === "delivery"
+      );
+      filteredOrders.sort(
+        (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      const data = await Promise.all(
+        filteredOrders.map(async (o: any) => {
+          const { data: details } = await (supabase as any).rpc("get_order_details", {
+            p_order_id: o.id,
+          });
+          return details || o;
+        })
+      );
       
       // Buscar nome do restaurante
       if (data && data.length > 0) {

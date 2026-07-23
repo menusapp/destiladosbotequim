@@ -46,11 +46,7 @@ export function KioskDeliveryAddress({ primaryColor, customerCpf, customerName, 
 
   const fetchAddresses = async () => {
     if (!customerCpf) { setLoading(false); return; }
-    const { data } = await supabase
-      .from("customer_addresses")
-      .select("*")
-      .eq("customer_cpf", customerCpf)
-      .order("created_at", { ascending: false });
+    const { data } = await (supabase as any).rpc('list_customer_addresses', { p_cpf: customerCpf, p_phone: customerPhone || null });
     setSavedAddresses(data || []);
     setLoading(false);
   };
