@@ -49,6 +49,7 @@ import { withProductComplements } from "@/lib/productComplements";
 import { TableCardMobile } from "./pdv/mobile/TableCardMobile";
 import { TableFilterChips } from "./pdv/mobile/TableFilterChips";
 import { cn } from "@/lib/utils";
+import { usePolling } from "@/hooks/usePolling";
 
 interface CartItem {
   productId: string;
@@ -479,6 +480,15 @@ const PDVTab = ({ restaurantId, restaurantSlug: slugProp, pendingTableToOpen, on
       .subscribe();
     return () => { clearTimeout(tablesTimer); clearTimeout(ordersTimer); supabase.removeChannel(ch); };
   }, [restaurantId, refetchTables, refetchTodayReservations, refetchPendingOrders, refetchActiveOrders, queryClient]);
+
+  // Fallback por polling — mantém o PDV atualizado mesmo sem eventos de
+  // Realtime (o token de sessão não trafega no websocket).
+  usePolling(() => {
+    refetchTables();
+    refetchTodayReservations();
+    refetchPendingOrders();
+    refetchActiveOrders();
+  });
 
   // Debounced search keeps typing snappy on large product lists
   const debouncedSearchTerm = useDebounce(searchTerm, 180);

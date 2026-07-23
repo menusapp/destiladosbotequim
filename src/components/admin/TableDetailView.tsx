@@ -34,6 +34,7 @@ import { AddItemsToOrderDrawer } from "./AddItemsToOrderDrawer";
 import { useStaffOrderPermissions } from "@/hooks/useStaffOrderPermissions";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog";
 import { checkOrderInPreparation } from "@/lib/dangerChecks";
+import { usePolling } from "@/hooks/usePolling";
 
 interface ComandaWithDetails {
   id: string;
@@ -94,6 +95,9 @@ export const TableDetailView = () => {
       return cleanup;
     }
   }, [tableId]);
+
+  // Fallback por polling (Realtime não recebe eventos sob RLS por token).
+  usePolling(() => { fetchTableData(); }, 12000, !!tableId);
 
   const setupRealtime = () => {
     const channel = supabase

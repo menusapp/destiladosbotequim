@@ -98,9 +98,23 @@ export function useRealtimeChannel({
 
     channel.subscribe();
 
+    // Fallback por POLLING: no modelo de sessão no servidor, o token não vai
+    // no websocket, então o Realtime não recebe eventos de tabelas protegidas
+    // por RLS. Um refetch periódico garante que o painel se mantenha atualizado
+    // (independente de o Realtime entregar ou não os eventos).
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    if (onChangeRef.current) {
+      pollTimer = setInterval(() => {
+        if (!cancelled && document.visibilityState === "visible") {
+          onChangeRef.current?.();
+        }
+      }, 12000);
+    }
+
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
+      if (pollTimer) clearInterval(pollTimer);
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

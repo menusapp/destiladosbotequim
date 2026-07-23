@@ -74,6 +74,7 @@ import {
   isReservationExpired,
 } from "@/lib/reservations";
 import { normalizeSearch } from "@/lib/searchNormalize";
+import { usePolling } from "@/hooks/usePolling";
 
 interface Comanda {
   id: string;
@@ -187,6 +188,9 @@ const TablesTab = ({ restaurantId }: { restaurantId: string }) => {
       supabase.removeChannel(channel);
     };
   }, [restaurantId]);
+
+  // Fallback por polling (Realtime não recebe eventos sob RLS por token).
+  usePolling(() => { fetchTables(); fetchReservations(); });
 
   const fetchRestaurantData = async () => {
     const { data } = await supabase
