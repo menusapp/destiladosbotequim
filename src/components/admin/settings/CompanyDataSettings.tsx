@@ -243,7 +243,7 @@ const CompanyDataSettings = ({ restaurantId }: { restaurantId: string }) => {
                   <Input
                     id="banner-upload"
                     type="file"
-                    accept="image/*"
+                    accept="image/*,image/webp,.webp,.jpg,.jpeg,.png,.gif"
                     onChange={handleBannerUpload}
                     disabled={uploadingBanner}
                     className="cursor-pointer"
