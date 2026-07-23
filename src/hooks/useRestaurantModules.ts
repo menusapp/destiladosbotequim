@@ -182,6 +182,8 @@ export function useRestaurantModules(restaurantId: string | null) {
     // Until we've actually loaded the subscription, fail-closed to avoid
     // a flash of unrestricted UI for paid sections.
     if (!loaded || allowedModules === null) return false;
+    // "all" is a wildcard meaning full access (Plano Completo)
+    if (allowedModules.includes("all")) return true;
     const moduleId = SECTION_TO_MODULE[sectionId];
     if (!moduleId) return true; // Sections not in the map are not plan-gated
     return allowedModules.includes(moduleId);
