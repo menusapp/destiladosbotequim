@@ -1,0 +1,1 @@
+UPDATE public.subscription_plans SET features = '["all","cardapio","delivery","mesas","pdv","financeiro","estoque","fidelidade","marketing","fiscal","whatsapp","pagamentos_online","kiosk"]'::jsonb WHERE id = '658bcf9a-c0c5-4421-8099-1f47742716b2';
