@@ -205,8 +205,9 @@ const LandingDestilado = () => {
   const address = (restaurant?.store_address || restaurant?.address) as string | undefined;
   const productsWithImages = products.filter((p) => !!p.image_url);
   const reelCards: Prod[] = productsWithImages.length ? productsWithImages : HOUSE_GALLERY;
-  // altura do "pin" proporcional à quantidade de cartões
-  const reelHeight = `${120 + Math.max(reelCards.length || 4, 4) * 26}vh`;
+  // altura do "pin" proporcional à quantidade de cartões (mais compacto)
+  const reelHeight = `${100 + Math.max(reelCards.length || 4, 4) * 12}vh`;
+
 
   const pillar = (icon: ReactNode, title: string, text: string, delay: number) => (
     <Reveal delay={delay} className="flex-1">
