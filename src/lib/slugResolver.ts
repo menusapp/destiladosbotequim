@@ -68,13 +68,18 @@ export function getSlugFromSubdomain(): string | null {
 }
 
 /**
- * Helper para hooks/páginas: retorna o slug do subdomínio se houver,
- * senão usa o slug do path (useParams). Como este app é de um único
- * estabelecimento, o último fallback é o slug configurado em
- * ESTABLISHMENT.slug — assim a raiz "/" resolve o estabelecimento.
+ * Helper para hooks/páginas: resolve o slug do restaurante.
+ *
+ * IMPORTANTE (estabelecimento único): NÃO usamos mais o subdomínio como slug.
+ * No modo SaaS antigo, cada restaurante tinha um subdomínio; agora há um só
+ * estabelecimento, e o host do Lovable (ex.: `destiladobotequim.lovable.app`)
+ * era interpretado erradamente como slug (`destiladobotequim`), sem bater com
+ * o slug real (`destilado-botequim`) — causando "Restaurante não encontrado".
+ * Por isso resolvemos apenas pelo path (`/:slug/...`) ou, na falta dele, pelo
+ * slug configurado em ESTABLISHMENT.slug.
  */
 export function resolveSlug(pathSlug?: string): string | undefined {
-  return getSlugFromSubdomain() || pathSlug || ESTABLISHMENT.slug || undefined;
+  return pathSlug || ESTABLISHMENT.slug || undefined;
 }
 
 /**
