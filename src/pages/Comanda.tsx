@@ -228,11 +228,11 @@ const Comanda = () => {
       );
 
       if (myComanda?.status === "closed") {
-        // TODO(security): needs RPC - bills has no RPC to fetch bill id for review;
-        // review modal will open without a specific bill id in this polling path.
         toast.success("Conta paga! Obrigado pela preferência!");
 
+        const { data: paidBillId } = await (supabase as any).rpc('get_paid_bill_for_comanda', { p_comanda_id: comandaId });
         sessionStorage.setItem('shouldShowReview', 'true');
+        if (paidBillId) sessionStorage.setItem('reviewBillId', paidBillId);
 
         sessionStorage.removeItem(`customer_name_${tableNumber}`);
         sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
