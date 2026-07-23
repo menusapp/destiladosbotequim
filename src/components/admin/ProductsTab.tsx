@@ -1325,7 +1325,7 @@ const handleDelete = async (id: string) => {
                 <Input
                   id="product-image"
                   type="file"
-                  accept="image/*"
+                  accept="image/*,image/webp,.webp,.jpg,.jpeg,.png,.gif"
                   onChange={(e) => setProductImage(e.target.files?.[0] || null)}
                 />
               </div>
