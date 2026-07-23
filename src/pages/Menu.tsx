@@ -518,25 +518,20 @@ const Menu = () => {
       if (!comandaId || !savedName) return;
       
       try {
-        const { data: comanda } = await supabase
-          .from("comandas")
-          .select("status")
-          .eq("id", comandaId)
-          .maybeSingle();
-        
+        const { data: comandaRows } = await (supabase as any).rpc("get_comanda_status_by_id", {
+          p_comanda_id: comandaId,
+        });
+        const comanda = Array.isArray(comandaRows) ? comandaRows[0] : comandaRows;
+
         if (!comanda || comanda.status === "closed") {
-          
-          const { data: paidBill } = await supabase
-            .from("bills")
-            .select("id")
-            .eq("comanda_id", comandaId)
-            .eq("status", "paid")
-            .limit(1)
-            .maybeSingle();
-          
-          if (paidBill) {
+
+          const { data: paidBillId } = await (supabase as any).rpc("get_paid_bill_for_comanda", {
+            p_comanda_id: comandaId,
+          });
+
+          if (paidBillId) {
             sessionStorage.setItem('shouldShowReview', 'true');
-            sessionStorage.setItem('reviewBillId', paidBill.id);
+            sessionStorage.setItem('reviewBillId', paidBillId);
           }
           
           sessionStorage.removeItem(`customer_name_${tableNumber}`);
@@ -601,35 +596,14 @@ const Menu = () => {
   // IMPORTANTE: Só libera mesa se NÃO houver comandas ativas, pedidos ativos OU bills não pagas
   useEffect(() => {
     const checkAndReleaseTa = async (currentTableId: string) => {
-      // Verificar se há bills não pagas (requested, on_the_way, pending)
-      const { data: hasUnpaidBills } = await supabase
-        .from("bills")
-        .select("id")
-        .eq("table_id", currentTableId)
-        .in("status", ["requested", "on_the_way", "pending"])
-        .limit(1);
-
-      // Verificar se há comandas ativas
-      const { data: hasActiveComandas } = await supabase
-        .from("comandas")
-        .select("id")
-        .eq("table_id", currentTableId)
-        .eq("status", "active")
-        .limit(1);
-
-      // Verificar se há pedidos ativos
-      const { data: hasActiveOrders } = await supabase
-        .from("orders")
-        .select("id")
-        .eq("table_id", currentTableId)
-        .in("status", ["pending", "accepted", "preparing", "ready"])
-        .limit(1);
+      // Verifica atividade em aberto (conta não paga, comanda ativa ou pedido
+      // em andamento) via RPC segura — antes eram 3 leituras diretas.
+      const { data: hasActivity } = await (supabase as any).rpc("table_has_activity", {
+        p_table_id: currentTableId,
+      });
 
       // Só liberar mesa se NÃO houver nenhuma condição ativa
-      const shouldKeepOccupied = 
-        (hasUnpaidBills && hasUnpaidBills.length > 0) ||
-        (hasActiveComandas && hasActiveComandas.length > 0) ||
-        (hasActiveOrders && hasActiveOrders.length > 0);
+      const shouldKeepOccupied = hasActivity === true;
 
       if (!shouldKeepOccupied) {
         await supabase.from("tables").update({
@@ -792,23 +766,25 @@ const Menu = () => {
         // Cliente já tem comanda ativa - usar a existente
         comandaId = existingComanda.id;
       } else {
-        // Criar nova comanda para este cliente (NÃO fechar as outras)
-        const { data: newComanda, error: comandaError } = await supabase
+        // Criar nova comanda para este cliente (NÃO fechar as outras).
+        // id gerado no cliente para não depender de `.select()` de retorno
+        // (bloqueado pelo RLS no fluxo anônimo).
+        const newComandaId = crypto.randomUUID();
+        const { error: comandaError } = await supabase
           .from("comandas")
           .insert({
+            id: newComandaId,
             restaurant_id: restaurant.id,
             table_id: tableData.id,
             customer_name: finalName,
             customer_cpf: cleanCpf,
             status: "active"
-          })
-          .select("id")
-          .single();
+          });
 
         if (comandaError) {
           console.error("Erro ao criar comanda:", comandaError);
         } else {
-          comandaId = newComanda.id;
+          comandaId = newComandaId;
         }
       }
 

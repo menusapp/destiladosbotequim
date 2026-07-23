@@ -220,14 +220,13 @@ export const LoyaltyRewardNotification = ({
       setCurrentValue(currentVal);
 
       // Fetch ALL redemptions for this customer in this program (all-time, not cycle-based)
-      const { data: allRedemptions } = await supabase
-        .from("loyalty_reward_redemptions")
-        .select("reward_id")
-        .eq("restaurant_id", restaurantId)
-        .eq("customer_cpf", customerCPF)
-        .eq("program_id", program.id);
+      // Via RPC segura (o RLS bloqueia a leitura direta no fluxo anônimo).
+      const { data: allRedemptions } = await (supabase as any).rpc("list_reward_redemptions", {
+        p_cpf: customerCPF,
+        p_program_id: program.id,
+      });
 
-      const redeemedRewardIds = new Set(allRedemptions?.map(r => r.reward_id) || []);
+      const redeemedRewardIds = new Set((allRedemptions || []).map((r: any) => r.reward_id));
 
       // All rewards for the program
       const allRewards = (program.loyalty_program_rewards || []) as any[];

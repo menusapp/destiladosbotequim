@@ -264,13 +264,10 @@ const CustomerInfoDialog = ({
         
         // Atualizar telefone se necessário
         if (!existingCustomer.phone && typedPhone) {
-          const { data: phoneExists } = await supabase
-            .from("customers")
-            .select("cpf, name")
-            .eq("restaurant_id", restaurantId)
-            .eq("phone", typedPhone)
-            .neq("cpf", sanitizedCPF)
-            .maybeSingle();
+          const { data: phoneExists } = await (supabase as any).rpc("customer_phone_taken", {
+            p_phone: typedPhone,
+            p_exclude_cpf: sanitizedCPF,
+          });
 
           if (phoneExists) {
             setPhoneError("Este telefone já está cadastrado para outro cliente");
@@ -298,13 +295,10 @@ const CustomerInfoDialog = ({
       // If new customer, create record in database
       if (!existingCustomer && restaurantId) {
         if (finalPhone) {
-          const { data: phoneExists } = await supabase
-            .from("customers")
-            .select("cpf, name")
-            .eq("restaurant_id", restaurantId)
-            .eq("phone", finalPhone)
-            .neq("cpf", sanitizedCPF)
-            .maybeSingle();
+          const { data: phoneExists } = await (supabase as any).rpc("customer_phone_taken", {
+            p_phone: finalPhone,
+            p_exclude_cpf: sanitizedCPF,
+          });
 
           if (phoneExists) {
             setPhoneError("Este telefone já está cadastrado para outro cliente");

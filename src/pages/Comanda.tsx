@@ -381,97 +381,27 @@ const Comanda = () => {
       // Buscar comanda_id do cliente atual
       const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
       
-      // Buscar última conta paga DESTA COMANDA específica (não da mesa toda)
-      // Isso evita que pagar uma comanda afete a visualização de outras comandas na mesma mesa
-      const lastPaidBillQuery = comandaId
-        ? supabase
-            .from("bills")
-            .select("paid_at")
-            .eq("comanda_id", comandaId)
-            .eq("status", "paid")
-            .order("paid_at", { ascending: false })
-            .limit(1)
-        : supabase
-            .from("bills")
-            .select("paid_at")
-            .eq("table_id", tableData.id)
-            .eq("status", "paid")
-            .order("paid_at", { ascending: false })
-            .limit(1);
+      // Pedidos + conta ativa da comanda via RPCs seguras (o RLS bloqueia a
+      // leitura direta de orders/bills no fluxo anônimo). get_comanda_orders
+      // já lida com ambos os casos (com/sem comanda_id) e com a última conta
+      // paga, devolvendo a estrutura aninhada esperada pela tela.
+      const { data: ordersData } = await (supabase as any).rpc("get_comanda_orders", {
+        p_table_id: tableData.id,
+        p_comanda_id: comandaId || null,
+        p_customer_cpf: customerCPF || null,
+      });
 
-      const { data: lastPaidBill } = await lastPaidBillQuery.maybeSingle();
+      const { data: activeBillRows } = await (supabase as any).rpc("get_active_bill", {
+        p_table_id: tableData.id,
+        p_comanda_id: comandaId || null,
+      });
 
-      // 🔑 CRÍTICO: Construir query de pedidos SEMPRE por comanda_id (não por CPF!)
-      // Isso evita mostrar pedidos de comandas antigas/fechadas
-      let ordersQuery;
-      
-      if (comandaId) {
-        // ✅ Busca APENAS pedidos desta comanda específica
-        ordersQuery = supabase
-          .from("orders")
-          .select(`
-            id, status, created_at, customer_name, notes,
-            order_items(
-              id, quantity, price_at_order, notes,
-              products(name, prep_time_minutes),
-              order_item_extras(price_at_order, extra_name, product_extras(name))
-            )
-          `)
-          .eq("comanda_id", comandaId);
-      } else {
-        // Fallback: sem comanda_id, buscar por mesa+CPF mas apenas pedidos NÃO entregues
-        // (isso evita mostrar histórico de comandas fechadas)
-        ordersQuery = supabase
-          .from("orders")
-          .select(`
-            id, status, created_at, customer_name, notes,
-            order_items(
-              id, quantity, price_at_order, notes,
-              products(name, prep_time_minutes),
-              order_item_extras(price_at_order, extra_name, product_extras(name))
-            )
-          `)
-          .eq("table_id", tableData.id)
-          .eq("customer_cpf", customerCPF)
-          .in("status", ["pending", "accepted", "preparing", "ready"]);
-        
-        // Se existe conta paga recente, buscar apenas pedidos criados após ela
-        if (lastPaidBill?.paid_at) {
-          ordersQuery = ordersQuery.gt("created_at", lastPaidBill.paid_at);
-        }
-      }
-
-      // Buscar pedidos e conta ativa em paralelo - bills filtrado por comanda_id (já declarado acima)
-      
-      // Buscar pedidos e conta ativa em paralelo - bills filtrado por comanda_id
-      const billQuery = comandaId
-        ? supabase
-            .from("bills")
-            .select("id, status")
-            .eq("comanda_id", comandaId)
-            .in("status", ["requested", "on_the_way"])
-            .order("created_at", { ascending: false })
-            .limit(1)
-        : supabase
-            .from("bills")
-            .select("id, status")
-            .eq("table_id", tableData.id)
-            .in("status", ["requested", "on_the_way"])
-            .order("created_at", { ascending: false })
-            .limit(1);
-      
-      const [ordersResult, billResult] = await Promise.all([
-        ordersQuery.order("created_at", { ascending: false }),
-        billQuery
-      ]);
-
-      if (ordersResult.data) {
-        setOrders(ordersResult.data);
-      }
+      const ordersList = Array.isArray(ordersData) ? ordersData : [];
+      setOrders(ordersList);
 
       // Só mostrar status de bill se houver pedidos
-      const activeBill = billResult.data?.[0];
-      if (activeBill && ordersResult.data && ordersResult.data.length > 0) {
+      const activeBill = Array.isArray(activeBillRows) ? activeBillRows[0] : activeBillRows;
+      if (activeBill && ordersList.length > 0) {
         setBillRequested(true);
         if (activeBill.status === "on_the_way") {
           setBillOnTheWay(true);
@@ -587,33 +517,32 @@ const Comanda = () => {
       if (!comandaId && customerName && customerCPF) {
         const cleanCpf = customerCPF.replace(/\D/g, '');
         
-        // Verificar se já existe uma comanda ativa para este cliente
-        const { data: existingComanda } = await supabase
-          .from("comandas")
-          .select("id")
-          .eq("table_id", tableId)
-          .eq("customer_cpf", cleanCpf)
-          .eq("status", "active")
-          .maybeSingle();
-        
+        // Verificar se já existe uma comanda ativa para este cliente (via RPC).
+        const { data: comandaStatusRows } = await (supabase as any).rpc("get_comanda_status", {
+          p_table_id: tableId,
+          p_cpf: cleanCpf,
+        });
+        const comandaStatusRow = Array.isArray(comandaStatusRows) ? comandaStatusRows[0] : comandaStatusRows;
+        const existingComanda = comandaStatusRow?.status === "active" ? { id: comandaStatusRow.id } : null;
+
         if (existingComanda) {
           comandaId = existingComanda.id;
         } else {
-          // Criar nova comanda
-          const { data: newComanda, error: comandaError } = await supabase
+          // Criar nova comanda — id gerado no cliente (sem `.select()` de retorno).
+          const newComandaId = crypto.randomUUID();
+          const { error: comandaError } = await supabase
             .from("comandas")
             .insert({
+              id: newComandaId,
               restaurant_id: tableData.restaurant_id,
               table_id: tableId,
               customer_name: customerName,
               customer_cpf: cleanCpf,
               status: "active"
-            })
-            .select("id")
-            .single();
-          
-          if (!comandaError && newComanda) {
-            comandaId = newComanda.id;
+            });
+
+          if (!comandaError) {
+            comandaId = newComandaId;
           }
         }
         
@@ -623,10 +552,13 @@ const Comanda = () => {
         }
       }
 
-      // Criar pedido
-      const { data: order, error: orderError } = await supabase
+      // Criar pedido — id gerado no cliente (sem `.select()` de retorno,
+      // bloqueado pelo RLS no fluxo anônimo).
+      const orderId = crypto.randomUUID();
+      const { error: orderError } = await supabase
         .from("orders")
         .insert({
+          id: orderId,
           table_id: tableId,
           restaurant_id: tableData.restaurant_id,
           customer_name: customerName || "",
@@ -635,32 +567,30 @@ const Comanda = () => {
           status: "pending",
           order_type: "local",
           notes: orderNotes || null,
-        })
-        .select()
-        .single();
+        });
 
       if (orderError) throw orderError;
 
       // Criar itens do pedido
       for (const item of cart) {
-        const { data: orderItem, error: itemError } = await supabase
+        const orderItemId = crypto.randomUUID();
+        const { error: itemError } = await supabase
           .from("order_items")
           .insert({
-            order_id: order.id,
+            id: orderItemId,
+            order_id: orderId,
             product_id: item.product.id,
             quantity: item.quantity,
             price_at_order: item.product.promotional_price ?? item.product.price,
             notes: item.notes || null,
-          })
-          .select()
-          .single();
+          });
 
         if (itemError) throw itemError;
 
         // Inserir extras do item
         if (item.extras.length > 0) {
           const orderItemExtras = item.extras.map((extra: any) => ({
-            order_item_id: orderItem.id,
+            order_item_id: orderItemId,
             product_extra_id: extra.is_complement ? null : extra.id,
             price_at_order: extra.price,
             extra_name: extra.name,
@@ -706,13 +636,12 @@ const Comanda = () => {
       return;
     }
 
-    // Verificar se já existe bill ativa para ESTA COMANDA (não para a mesa toda)
-    const { data: existingBill } = await supabase
-      .from("bills")
-      .select("id, status")
-      .eq("comanda_id", comandaId)
-      .in("status", ["requested", "on_the_way"])
-      .limit(1);
+    // Verificar se já existe bill ativa para ESTA COMANDA (via RPC segura).
+    const { data: existingBillRows } = await (supabase as any).rpc("get_active_bill", {
+      p_table_id: tableId,
+      p_comanda_id: comandaId,
+    });
+    const existingBill = Array.isArray(existingBillRows) ? existingBillRows : (existingBillRows ? [existingBillRows] : []);
 
     if (existingBill && existingBill.length > 0) {
       // Já existe bill para esta comanda - apenas atualizar estado local
@@ -739,7 +668,9 @@ const Comanda = () => {
       // Usar method_type diretamente (cash, credit, debit, pix, meal_voucher)
       const normalizedPaymentMethod = selectedPaymentMethodType || "cash";
 
-      const { data: billData, error } = await supabase
+      // Sem `.select()` de retorno (bloqueado pelo RLS no fluxo anônimo);
+      // billData não é usado adiante.
+      const { error } = await supabase
         .from("bills")
         .insert({
           table_id: tableId,
@@ -750,9 +681,7 @@ const Comanda = () => {
           status: "requested",
           payment_method: normalizedPaymentMethod,
           change_amount: isCash ? parseFloat(changeAmount || "0") : null,
-        })
-        .select()
-        .single();
+        });
 
       if (error) throw error;
 

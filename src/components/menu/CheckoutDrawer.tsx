@@ -225,33 +225,36 @@ export const CheckoutDrawer = ({
 
       if (existingOrderId) {
         // Finalize previously pre-created online-payment order: just update it.
-        const { data: updated, error: updateError } = await supabase
+        // Sem `.select()` de retorno: no fluxo anônimo (cliente sem sessão) o
+        // RLS não permite ler a linha de volta; só precisamos do id, que já
+        // temos em existingOrderId.
+        const { error: updateError } = await supabase
           .from("orders")
           .update({
             payment_type: orderData.payment_type,
             payment_status: orderData.payment_status,
             online_payment_id: orderData.online_payment_id,
           })
-          .eq("id", existingOrderId)
-          .select()
-          .single();
+          .eq("id", existingOrderId);
         if (updateError) {
           console.error("Erro ao finalizar pedido online:", updateError);
           throw updateError;
         }
-        order = updated;
+        order = { id: existingOrderId, ...orderData };
       } else {
-        const { data: inserted, error: orderError } = await supabase
+        // Geramos o id no cliente (UUID) para não depender de `.select()` de
+        // retorno — que o RLS bloqueia para o cliente anônimo. O INSERT
+        // anônimo escopado continua permitido.
+        const orderId = crypto.randomUUID();
+        const { error: orderError } = await supabase
           .from("orders")
-          .insert(orderData)
-          .select()
-          .single();
+          .insert({ id: orderId, ...orderData });
 
         if (orderError) {
           console.error("Erro ao criar pedido:", orderError);
           throw orderError;
         }
-        order = inserted;
+        order = { id: orderId, ...orderData };
       }
 
       // Insert order items (skip when finalizing an existing order — items already exist)
@@ -262,24 +265,26 @@ export const CheckoutDrawer = ({
             ? 0 
             : (item.product.promotional_price ?? item.product.price);
 
-          const { data: orderItem, error: itemError } = await supabase
+          // id gerado no cliente para não depender de `.select()` de retorno
+          // (bloqueado pelo RLS no fluxo anônimo).
+          const orderItemId = crypto.randomUUID();
+          const { error: itemError } = await supabase
             .from("order_items")
             .insert({
+              id: orderItemId,
               order_id: order.id,
               product_id: item.product.id,
               quantity: item.quantity,
               price_at_order: priceAtOrder,
               notes: item.notes,
-            })
-            .select()
-            .single();
+            });
 
           if (itemError) throw itemError;
 
           // For reward/coupon items with extras, price should also be 0
           for (const extra of item.extras) {
             await supabase.from("order_item_extras").insert({
-              order_item_id: orderItem.id,
+              order_item_id: orderItemId,
               product_extra_id: (extra as any).is_complement ? null : extra.id,
               price_at_order: (item.isRewardItem || item.isCouponFreeItem) ? 0 : extra.price,
               extra_name: extra.name,
@@ -307,63 +312,37 @@ export const CheckoutDrawer = ({
 
         if (activeProgram) {
           for (const rewardItem of rewardItems) {
-            // Security: check if reward was already redeemed
-            const { data: existingRedemption } = await supabase
-              .from("loyalty_reward_redemptions")
-              .select("id")
-              .eq("restaurant_id", restaurant.id)
-              .eq("customer_cpf", customerData.cpf)
-              .eq("program_id", activeProgram.id)
-              .eq("reward_id", rewardItem.rewardId)
-              .maybeSingle();
-
-            if (existingRedemption) {
-              console.warn("Reward already redeemed, skipping:", rewardItem.rewardId);
-              continue;
-            }
-
-            // Get the reward's trigger_value
+            // Get the reward's trigger_value (leitura pública — catálogo)
             const { data: reward } = await supabase
               .from("loyalty_program_rewards")
               .select("trigger_value")
               .eq("id", rewardItem.rewardId)
               .single();
 
-            await supabase.from("loyalty_reward_redemptions").insert({
-              restaurant_id: restaurant.id,
-              customer_cpf: customerData.cpf,
-              program_id: activeProgram.id,
-              reward_id: rewardItem.rewardId,
-              order_id: order.id,
-              trigger_value: reward?.trigger_value || 0,
-              redeemed_at: new Date().toISOString(),
+            // Registro atômico (checa duplicidade + insere) via RPC segura.
+            const { data: recorded } = await (supabase as any).rpc("record_reward_redemption", {
+              p_cpf: customerData.cpf,
+              p_program_id: activeProgram.id,
+              p_reward_id: rewardItem.rewardId,
+              p_order_id: order.id,
+              p_trigger_value: reward?.trigger_value || 0,
             });
+            if (recorded === false) {
+              console.warn("Reward already redeemed, skipping:", rewardItem.rewardId);
+            }
           }
         }
       }
 
-      // Record redemption for discount rewards
+      // Record redemption for discount rewards (atômico + anti-duplicidade via RPC)
       if (activeRewardDiscount) {
-        // Security: check if discount reward was already redeemed
-        const { data: existingDiscountRedemption } = await supabase
-          .from("loyalty_reward_redemptions")
-          .select("id")
-          .eq("restaurant_id", restaurant.id)
-          .eq("customer_cpf", customerData.cpf)
-          .eq("reward_id", activeRewardDiscount.id)
-          .maybeSingle();
-
-        if (!existingDiscountRedemption) {
-          await supabase.from("loyalty_reward_redemptions").insert({
-            restaurant_id: restaurant.id,
-            customer_cpf: customerData.cpf,
-            program_id: activeRewardDiscount.programId,
-            reward_id: activeRewardDiscount.id,
-            order_id: order.id,
-            trigger_value: activeRewardDiscount.triggerValue,
-            redeemed_at: new Date().toISOString(),
-          });
-        }
+        await (supabase as any).rpc("record_reward_redemption", {
+          p_cpf: customerData.cpf,
+          p_program_id: activeRewardDiscount.programId,
+          p_reward_id: activeRewardDiscount.id,
+          p_order_id: order.id,
+          p_trigger_value: activeRewardDiscount.triggerValue,
+        });
       }
 
       if (coupon) {
@@ -452,43 +431,15 @@ export const CheckoutDrawer = ({
     orderId: string,
     type: "earn" | "redeem"
   ) => {
-    const { data: existing } = await supabase
-      .from("loyalty_points")
-      .select("*")
-      .eq("customer_cpf", cpf)
-      .eq("restaurant_id", restaurantId)
-      .single();
-
-    if (existing) {
-      const newBalance = existing.points_balance + points;
-      const newEarned = type === "earn" ? existing.total_earned + points : existing.total_earned;
-      const newRedeemed = type === "redeem" ? existing.total_redeemed + Math.abs(points) : existing.total_redeemed;
-
-      await supabase
-        .from("loyalty_points")
-        .update({
-          points_balance: newBalance,
-          total_earned: newEarned,
-          total_redeemed: newRedeemed,
-          last_updated: new Date().toISOString(),
-        })
-        .eq("id", existing.id);
-    } else {
-      await supabase.from("loyalty_points").insert({
-        customer_cpf: cpf,
-        restaurant_id: restaurantId,
-        points_balance: points > 0 ? points : 0,
-        total_earned: points > 0 ? points : 0,
-        total_redeemed: points < 0 ? Math.abs(points) : 0,
-      });
-    }
-
-    await supabase.from("loyalty_transactions").insert({
-      customer_cpf: cpf,
-      restaurant_id: restaurantId,
-      order_id: orderId,
-      points,
-      type,
+    // Aplica ganho/resgate de pontos de forma ATÔMICA no servidor e já
+    // registra a transação. Substitui a leitura/escrita direta de
+    // loyalty_points (bloqueada pelo RLS no fluxo anônimo). `apply_loyalty`
+    // espera pontos positivos + o tipo.
+    await (supabase as any).rpc("apply_loyalty", {
+      p_cpf: cpf,
+      p_points: Math.abs(points),
+      p_type: type,
+      p_order_id: orderId,
     });
   };
 
