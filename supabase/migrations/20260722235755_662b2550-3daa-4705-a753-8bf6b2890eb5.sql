@@ -1,0 +1,1 @@
+UPDATE public.restaurants SET banner_url = '/__l5e/assets-v1/9f2c8577-a8a9-4b2b-a1c0-87d27b4f447f/facade-night-hq.jpg' WHERE slug = 'destilado-botequim';

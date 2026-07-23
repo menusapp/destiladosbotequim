@@ -4,6 +4,27 @@ import { supabase } from "@/integrations/supabase/client";
 import { ESTABLISHMENT } from "@/config/establishment";
 import { useReveal } from "@/hooks/useReveal";
 import { Flame, Wine, Users, Instagram, MapPin, ArrowRight, ChevronDown } from "lucide-react";
+import bolinhosAsset from "@/assets/destilado/bolinhos.webp.asset.json";
+import burgerAsset from "@/assets/destilado/burger.webp.asset.json";
+import carneSecaAsset from "@/assets/destilado/carne-seca.webp.asset.json";
+import frangoDrinkAsset from "@/assets/destilado/frango-drink.webp.asset.json";
+import iscasChoppAsset from "@/assets/destilado/iscas-chopp.webp.asset.json";
+import picanhaFritasAsset from "@/assets/destilado/picanha-fritas.webp.asset.json";
+import picanhaHeinekenAsset from "@/assets/destilado/picanha-heineken.webp.asset.json";
+import facadeDayAsset from "@/assets/destilado/facade-day-hq.jpg.asset.json";
+import facadeNightAsset from "@/assets/destilado/facade-night-hq.jpg.asset.json";
+import logoAsset from "@/assets/destilado/logo.jpg.asset.json";
+
+/* Fotos reais do Destilado — usadas como fallback quando não há produtos cadastrados */
+const HOUSE_GALLERY: Prod[] = [
+  { id: "h-picanha", name: "Picanha na chapa com fritas", price: 0, promotional_price: null, image_url: picanhaFritasAsset.url },
+  { id: "h-iscas",   name: "Iscas de frango & chopp",     price: 0, promotional_price: null, image_url: iscasChoppAsset.url },
+  { id: "h-bolinhos",name: "Trio de bolinhos da casa",     price: 0, promotional_price: null, image_url: bolinhosAsset.url },
+  { id: "h-carne",   name: "Carne seca com mandioca",      price: 0, promotional_price: null, image_url: carneSecaAsset.url },
+  { id: "h-burger",  name: "Burger cheddar & cebola",      price: 0, promotional_price: null, image_url: burgerAsset.url },
+  { id: "h-frango",  name: "Frango à passarinho",          price: 0, promotional_price: null, image_url: frangoDrinkAsset.url },
+  { id: "h-brinde",  name: "Brinde com picanha & Heineken",price: 0, promotional_price: null, image_url: picanhaHeinekenAsset.url },
+];
 
 /* Paleta da marca — calibrada pelas fotos reais do Destilado:
    verde do letreiro, luz âmbar quente da fachada, creme das paredes,
@@ -180,12 +201,15 @@ const LandingDestilado = () => {
     };
   }, [reduceMotion, products.length]);
 
-  const logo = restaurant?.logo_url as string | undefined;
-  const banner = (restaurant?.banner_url || restaurant?.cover_url) as string | undefined;
+  const logo = (restaurant?.logo_url as string | undefined) || logoAsset.url;
+  const banner = (restaurant?.banner_url || restaurant?.cover_url) as string | undefined || facadeNightAsset.url;
+  const ambientPhoto = facadeDayAsset.url;
   const address = (restaurant?.store_address || restaurant?.address) as string | undefined;
-  const reelCards = products.length ? products : [];
-  // altura do "pin" proporcional à quantidade de cartões
-  const reelHeight = `${120 + Math.max(reelCards.length || 4, 4) * 26}vh`;
+  const productsWithImages = products.filter((p) => !!p.image_url);
+  const reelCards: Prod[] = productsWithImages.length ? productsWithImages : HOUSE_GALLERY;
+  // altura do "pin" proporcional à quantidade de cartões (mais compacto)
+  const reelHeight = `${100 + Math.max(reelCards.length || 4, 4) * 12}vh`;
+
 
   const pillar = (icon: ReactNode, title: string, text: string, delay: number) => (
     <Reveal delay={delay} className="flex-1">
@@ -312,45 +336,64 @@ const LandingDestilado = () => {
         </div>
       </section>
 
-      {/* ===== GALERIA HORIZONTAL (pratos reais) ===== */}
-      {reduceMotion ? (
-        <section className="py-20" style={{ background: C.greenDeep }}>
-          <div className="mx-auto max-w-6xl px-6">
-            <h2 className="font-display text-4xl mb-8" style={{ color: C.cream }}>Da nossa cozinha</h2>
-            <div className="flex gap-5 overflow-x-auto pb-4 scrollbar-hide" style={{ scrollSnapType: "x mandatory" }}>
-              {(reelCards.length ? reelCards : Array.from({ length: 5 })).map((p: any, i) => (
-                <ReelCard key={p?.id || i} product={p} />
-              ))}
-            </div>
-          </div>
-        </section>
-      ) : (
-        <section ref={reelWrapRef} className="relative" style={{ height: reelHeight, background: C.greenDeep }}>
-          <div className="grain sticky top-0 flex h-[100svh] flex-col justify-center overflow-hidden">
-            <div className="mx-auto mb-10 w-full max-w-6xl px-6">
-              <Reveal>
+      {/* ===== GALERIA horizontal (scroll pin) ===== */}
+      <section
+        ref={reelWrapRef}
+        className="relative"
+        style={{ height: reduceMotion ? "auto" : reelHeight, background: C.greenDeep }}
+      >
+        <div
+          className={`${reduceMotion ? "" : "sticky top-0"} flex h-screen w-full flex-col justify-center overflow-hidden px-6 py-16`}
+        >
+          <div className="mx-auto mb-10 flex w-full max-w-6xl flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <Reveal>
+              <div>
                 <span className="text-[11px] font-semibold uppercase tracking-[0.4em]" style={{ color: C.gold }}>O balcão</span>
-                <h2 className="font-display text-4xl sm:text-6xl" style={{ color: C.cream }}>Da nossa cozinha</h2>
-              </Reveal>
-            </div>
-            <div ref={reelTrackRef} className="flex items-stretch gap-6 pl-[6vw] pr-[40vw] will-change-transform" style={{ width: "max-content" }}>
-              {(reelCards.length ? reelCards : Array.from({ length: 6 })).map((p: any, i) => (
-                <ReelCard key={p?.id || i} product={p} />
+                <h2 className="mt-3 font-display text-4xl sm:text-5xl" style={{ color: C.cream }}>Da nossa cozinha</h2>
+              </div>
+            </Reveal>
+            <Reveal delay={80}>
+              <button onClick={goOrder}
+                className="inline-flex items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-semibold"
+                style={{ borderColor: "rgba(216,162,74,0.5)", color: C.gold }}>
+                Ver cardápio completo <ArrowRight className="h-4 w-4" />
+              </button>
+            </Reveal>
+          </div>
+
+          {reduceMotion ? (
+            <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+              {reelCards.map((p) => (
+                <ReelCard key={p.id} product={p} />
               ))}
             </div>
-            <p className="mx-auto mt-8 w-full max-w-6xl px-6 text-xs" style={{ color: "rgba(244,236,214,0.5)" }}>
-              role para ver o cardápio passar →
-            </p>
-          </div>
-        </section>
-      )}
+          ) : (
+            <div
+              ref={reelTrackRef}
+              className="flex items-center gap-6 pl-[10vw] pr-[40vw] will-change-transform"
+              style={{ transform: "translate3d(0,0,0)" }}
+            >
+              {reelCards.map((p) => (
+                <div key={p.id} className="shrink-0 w-[62vw] sm:w-[42vw] md:w-[32vw] lg:w-[24vw]">
+                  <ReelCard product={p} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+
+
 
       {/* ===== AMBIENTE ===== */}
       <section className="relative overflow-hidden px-6 py-28" style={{ background: C.green }}>
         <div className="mx-auto grid max-w-6xl items-center gap-12 md:grid-cols-2">
           <Reveal>
             <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl" style={{ background: C.greenDeep }}>
-              {banner ? (
+              {ambientPhoto ? (
+                <img src={ambientPhoto} alt="Fachada do Destilado Botequim" className="db-kenburns h-full w-full object-cover" />
+              ) : banner ? (
                 <img src={banner} alt="Ambiente do Destilado Botequim" className="db-kenburns h-full w-full object-cover" />
               ) : (
                 <div className="grain flex h-full w-full items-center justify-center">
@@ -458,7 +501,8 @@ const LandingDestilado = () => {
 function ReelCard({ product }: { product?: Prod }) {
   const price = product ? (product.promotional_price ?? product.price) : null;
   return (
-    <div className="w-[68vw] max-w-[340px] shrink-0 sm:w-[340px]" style={{ willChange: "transform, opacity" }}>
+    <div className="w-full" style={{ willChange: "transform, opacity" }}>
+
       <div className="relative aspect-[3/4] overflow-hidden rounded-2xl" style={{ background: "#16382a" }}>
         {product?.image_url ? (
           <img src={product.image_url} alt={product.name} className="h-full w-full object-cover transition-transform duration-700 hover:scale-105" />
