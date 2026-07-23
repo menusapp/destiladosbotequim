@@ -275,15 +275,8 @@ const Menu = () => {
         }
         
         // Verificar se existe bill paga DESTA COMANDA específica
-        // TODO(security): needs RPC - no bills RPC available to check paid status by comanda_id
-        const { data: clientPaidBill } = await supabase
-          .from("bills")
-          .select("id")
-          .eq("comanda_id", comandaId)
-          .eq("status", "paid")
-          .limit(1);
-        
-        if (clientPaidBill && clientPaidBill.length > 0) {
+        const { data: paidBillId } = await (supabase as any).rpc('get_paid_bill_for_comanda', { p_comanda_id: comandaId });
+        if (paidBillId) {
           setHasOpenComanda(false);
           setComandaTotal(cartTotal);
           setComandaStatus("");
