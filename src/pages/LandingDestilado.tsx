@@ -11,7 +11,7 @@ import frangoDrinkAsset from "@/assets/destilado/frango-drink.webp.asset.json";
 import iscasChoppAsset from "@/assets/destilado/iscas-chopp.webp.asset.json";
 import picanhaFritasAsset from "@/assets/destilado/picanha-fritas.webp.asset.json";
 import picanhaHeinekenAsset from "@/assets/destilado/picanha-heineken.webp.asset.json";
-import facadeDayAsset from "@/assets/destilado/facade-day.webp.asset.json";
+import facadeDayAsset from "@/assets/destilado/facade-day-hq.jpg.asset.json";
 import facadeNightAsset from "@/assets/destilado/facade-night-hq.jpg.asset.json";
 import logoAsset from "@/assets/destilado/logo.jpg.asset.json";
 
