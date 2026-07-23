@@ -40,18 +40,10 @@ export const ReviewModal = ({
 
     try {
       // Verificar se a bill ainda existe (pode ter sido deletada)
-      // TODO(security): needs RPC - no existing RPC allows checking a bill by id alone
-      // (get_comanda_status requires p_table_id+p_cpf, not available here). Left as direct
-      // read for now; only returns the id, not sensitive data.
       let validBillId = null;
       if (billId) {
-        const { data: billExists } = await supabase
-          .from("bills")
-          .select("id")
-          .eq("id", billId)
-          .maybeSingle();
-        
-        validBillId = billExists?.id || null;
+        const { data: existingId } = await (supabase as any).rpc('check_bill_exists', { p_bill_id: billId });
+        validBillId = existingId || null;
       }
 
       const { error } = await supabase.from("restaurant_reviews").insert({
