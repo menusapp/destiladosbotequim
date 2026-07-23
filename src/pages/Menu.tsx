@@ -481,92 +481,8 @@ const Menu = () => {
         
         // Silenciado para não atrapalhar cliente
       })
-      // 🔔 Listener de pedidos com notificações de status (usando refs para evitar stale closures)
-      .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'orders',
-        filter: `restaurant_id=eq.${restaurantId}`
-      }, (payload) => {
-        const order = payload.new as any;
-        const oldOrder = payload.old as any;
-        
-        // Usar refs para obter valores atualizados
-        const currentTableId = tableIdRef.current;
-        const currentCustomer = customerInfoRef.current;
-        
-        
-        // Verificar se é pedido deste cliente nesta mesa
-        if (currentTableId && order.table_id === currentTableId && currentCustomer) {
-          const cleanCPF = currentCustomer.cpf?.replace(/\D/g, '');
-          
-          if (order.customer_cpf === cleanCPF || order.customer_cpf === currentCustomer.cpf) {
-            // Notificar mudança de status apenas se mudou
-            // Silenciado - notificações de status removidas do cardápio do cliente
-          }
-        }
-        
-        // Atualizar dados da comanda usando ref
-        if (currentTableId) checkOpenComanda(currentTableId, cart);
-      })
-      // 🔔 Listener de INSERT em pedidos (usando ref)
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'orders',
-        filter: `restaurant_id=eq.${restaurantId}`
-      }, () => {
-        const currentTableId = tableIdRef.current;
-        if (currentTableId) checkOpenComanda(currentTableId, cart);
-      })
-      // 💳 Listener de contas (bills) UPDATE para detectar pagamento (usando ref)
-      // Nota: bills não tem restaurant_id; filtragem por mesa do cliente é feita no callback
-      .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'bills'
-      }, (payload) => {
-        const bill = payload.new as any;
-        const oldBill = payload.old as any;
-        
-        const currentTableId = tableIdRef.current;
-        
-        // Verificar se a conta foi paga e pertence à mesa atual E à comanda do cliente
-        if (currentTableId && bill.table_id === currentTableId) {
-          // Filtrar por comanda_id para isolamento entre clientes na mesma mesa
-          const myComandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
-          const billBelongsToMe = !myComandaId || bill.comanda_id === myComandaId;
-          
-          if (billBelongsToMe && bill.status === 'paid' && oldBill?.status !== 'paid') {
-            
-            setReviewBillId(bill.id);
-            setReviewModalOpen(true);
-          }
-        }
-      })
-      // 💳 Listener de contas (bills) INSERT para detectar pagamento direto pelo PDV (usando ref)
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'bills'
-      }, (payload) => {
-        const bill = payload.new as any;
-        
-        const currentTableId = tableIdRef.current;
-        
-        // Quando garçom paga pelo PDV sem cliente pedir conta, INSERT já vem com status='paid'
-        if (currentTableId && bill.table_id === currentTableId && bill.status === 'paid') {
-          // Filtrar por comanda_id para isolamento entre clientes na mesma mesa
-          const myComandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
-          const billBelongsToMe = !myComandaId || bill.comanda_id === myComandaId;
-          
-          if (billBelongsToMe) {
-            
-            setReviewBillId(bill.id);
-            setReviewModalOpen(true);
-          }
-        }
-      })
+      // NOTE: orders/bills postgres_changes listeners removed (locked tables).
+      // Replaced by 15s polling of get_comanda_status in a dedicated useEffect below.
       // 🚪 Listener de mesa para detectar esvaziamento forçado (admin)
       .on('postgres_changes', { 
         event: 'UPDATE', 
@@ -610,6 +526,34 @@ const Menu = () => {
       supabase.removeChannel(channel); 
     };
   }, [fetchData, restaurantSlug, tableNumber, restaurant?.id]);
+
+  // 🔁 Polling (15s) de status de comanda/pedidos/conta - substitui realtime em orders/bills
+  useEffect(() => {
+    if (!restaurant?.id) return;
+    const interval = setInterval(async () => {
+      const currentTableId = tableIdRef.current;
+      const currentCustomer = customerInfoRef.current;
+      if (!currentTableId || !currentCustomer) return;
+
+      // Atualiza dados de comanda/pedidos
+      checkOpenComanda(currentTableId, cart);
+
+      // Verificar status da comanda para detectar fechamento (pagamento)
+      const { data: comandaRows } = await (supabase as any).rpc("get_comanda_status", {
+        p_table_id: currentTableId,
+        p_cpf: currentCustomer.cpf,
+      });
+      const myComandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+      const myComanda = (Array.isArray(comandaRows) ? comandaRows : [comandaRows]).find(
+        (c: any) => c?.id === myComandaId
+      );
+      if (myComanda?.status === "closed" && !reviewModalOpen) {
+        setReviewModalOpen(true);
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [restaurant?.id, tableNumber, cart, checkOpenComanda, reviewModalOpen]);
 
   // 🔒 Revalidar sessão ao voltar do background (visibilitychange + focus)
   useEffect(() => {

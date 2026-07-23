@@ -184,16 +184,14 @@ const Comanda = () => {
       if (!comandaId) {
         const customerCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
         if (customerCPF) {
-          // Buscar comanda ativa deste cliente nesta mesa
-          const { data: activeComanda } = await supabase
-            .from("comandas")
-            .select("id")
-            .eq("table_id", tableData.id)
-            .eq("customer_cpf", customerCPF.replace(/\D/g, ''))
-            .eq("status", "active")
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+          // Buscar comanda ativa deste cliente nesta mesa via RPC
+          const { data: comandaRows } = await (supabase as any).rpc("get_comanda_status", {
+            p_table_id: tableData.id,
+            p_cpf: customerCPF.replace(/\D/g, ''),
+          });
+          const activeComanda = (Array.isArray(comandaRows) ? comandaRows : [comandaRows]).find(
+            (c: any) => c?.status === "active"
+          );
           
           if (activeComanda) {
             comandaId = activeComanda.id;
@@ -207,159 +205,55 @@ const Comanda = () => {
         return;
       }
       
-      
-      // Função para processar pagamento (seja UPDATE ou INSERT de bill paga)
-      const handleBillPaid = (bill: any) => {
+      // NOTE: bills/orders postgres_changes realtime removed (locked tables).
+      // Replaced by 15s polling of get_comanda_status + fetchData below.
+    };
+    
+    setupRealtimeChannels();
+
+    // 🔁 Polling (15s) do status da comanda - substitui realtime em bills/orders
+    const pollComandaStatus = async () => {
+      const comandaId = sessionStorage.getItem(`comanda_id_${tableNumber}`);
+      const rawCustomerCPF = sessionStorage.getItem(`customer_cpf_${tableNumber}`);
+      const customerCPF = (rawCustomerCPF || '').replace(/\D/g, '');
+      const savedTableId = sessionStorage.getItem(`table_id_${tableNumber}`);
+      if (!comandaId || !customerCPF || !savedTableId) return;
+
+      const { data: comandaRows } = await (supabase as any).rpc("get_comanda_status", {
+        p_table_id: savedTableId,
+        p_cpf: customerCPF,
+      });
+      const myComanda = (Array.isArray(comandaRows) ? comandaRows : [comandaRows]).find(
+        (c: any) => c?.id === comandaId
+      );
+
+      if (myComanda?.status === "closed") {
+        // TODO(security): needs RPC - bills has no RPC to fetch bill id for review;
+        // review modal will open without a specific bill id in this polling path.
         toast.success("Conta paga! Obrigado pela preferência!");
-        
-        // Fechar comanda ativa
-        if (comandaId) {
-          supabase.from("comandas").update({
-            status: "closed",
-            closed_at: new Date().toISOString()
-          }).eq("id", comandaId);
-        }
-        
-        // Salvar informações para abrir modal de avaliação
+
         sessionStorage.setItem('shouldShowReview', 'true');
-        if (bill?.id) {
-          sessionStorage.setItem('reviewBillId', bill.id);
-        }
-        
-        // Limpar TODOS os dados do cliente da sessão
+
         sessionStorage.removeItem(`customer_name_${tableNumber}`);
         sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
         sessionStorage.removeItem(`cart_${tableNumber}`);
         sessionStorage.removeItem(`comanda_id_${tableNumber}`);
         sessionStorage.removeItem("customerInfo");
-        
+
         setTimeout(() => {
           navigate(`/${restaurantSlug}/mesa/${tableNumber}`);
         }, 2000);
-      };
+        return;
+      }
 
-      // Configurar realtime para atualizar status da conta - SEMPRE por comanda_id
-      // (comandaId é garantido existir neste ponto do código)
-      const billFilter = `comanda_id=eq.${comandaId}`;
-      
-      billChannel = supabase
-        .channel(`bill-status-${comandaId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'bills',
-            filter: billFilter,
-          },
-          (payload) => {
-            const bill = payload.new as any;
-            
-            if (bill?.status === "on_the_way") {
-              setBillOnTheWay(true);
-              // Silenciado para cliente
-            }
-            
-            if (bill?.status === "paid") {
-              handleBillPaid(bill);
-            }
-            
-            // Recarregar dados de qualquer forma
-            fetchData();
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'bills',
-            filter: billFilter,
-          },
-          (payload) => {
-            const bill = payload.new as any;
-            
-            // Bill criada já como paga (pelo PDV sem cliente ter solicitado)
-            if (bill?.status === "paid") {
-              handleBillPaid(bill);
-            } else {
-              // Bill criada com outro status - atualizar estado
-              setBillRequested(true);
-              if (bill?.status === "on_the_way") {
-                setBillOnTheWay(true);
-              }
-              fetchData();
-            }
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'DELETE',
-            schema: 'public',
-            table: 'bills',
-            filter: billFilter,
-          },
-          (payload) => {
-            // Conta removida (paga e encerrada) -> agradecer e sair
-            const deletedBill = payload.old as any;
-            // Silenciado para cliente
-            
-            // Fechar comanda ativa
-            if (comandaId) {
-              supabase.from("comandas").update({
-                status: "closed",
-                closed_at: new Date().toISOString()
-              }).eq("id", comandaId);
-            }
-            
-            // Salvar informações para abrir modal de avaliação
-            sessionStorage.setItem('shouldShowReview', 'true');
-            if (deletedBill?.id) {
-              sessionStorage.setItem('reviewBillId', deletedBill.id);
-            }
-            
-            // Limpar TODOS os dados do cliente da sessão
-            sessionStorage.removeItem(`customer_name_${tableNumber}`);
-            sessionStorage.removeItem(`customer_cpf_${tableNumber}`);
-            sessionStorage.removeItem(`cart_${tableNumber}`);
-            sessionStorage.removeItem(`comanda_id_${tableNumber}`);
-            sessionStorage.removeItem("customerInfo");
-            
-            setTimeout(() => {
-              navigate(`/${restaurantSlug}/mesa/${tableNumber}`);
-            }, 1500);
-          }
-        )
-        .subscribe((status) => {
-        });
-      
-      // Configurar realtime para pedidos aceitos - SEMPRE por comanda_id
-      // (comandaId é garantido existir neste ponto do código)
-      const ordersFilter = `comanda_id=eq.${comandaId}`;
-      
-      ordersChannel = supabase
-        .channel(`order-status-${comandaId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'orders',
-            filter: ordersFilter,
-          },
-          (payload) => {
-            // Atualiza dados para refletir status
-            fetchData();
-          }
-        )
-        .subscribe((status) => {
-        });
+      // Recarregar dados de pedidos/conta
+      fetchData();
     };
-    
-    setupRealtimeChannels();
+
+    const pollInterval = setInterval(pollComandaStatus, 15000);
     
     return () => {
+      clearInterval(pollInterval);
       if (billChannel) {
         supabase.removeChannel(billChannel);
       }
@@ -378,6 +272,8 @@ const Comanda = () => {
       if (!comandaId || !savedName) return;
       
       try {
+        // TODO(security): needs table_id to use get_comanda_status RPC here reliably;
+        // left as direct read (comandas) pending a get_comanda_status-by-id RPC variant.
         const { data: comanda } = await supabase
           .from("comandas")
           .select("status")
@@ -386,6 +282,7 @@ const Comanda = () => {
         
         if (!comanda || comanda.status === "closed") {
           
+          // TODO(security): needs RPC - no bills RPC to fetch paid bill id by comanda_id
           const { data: paidBill } = await supabase
             .from("bills")
             .select("id")
