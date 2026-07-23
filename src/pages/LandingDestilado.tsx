@@ -63,7 +63,9 @@ const LandingDestilado = () => {
   const reelWrapRef = useRef<HTMLDivElement>(null);
   const reelTrackRef = useRef<HTMLDivElement>(null);
 
-  const goOrder = () => navigate("/cardapio");
+  // Navega direto pelo slug real do estabelecimento (à prova de falha na
+  // resolução de rota), em vez de depender do alias /cardapio.
+  const goOrder = () => navigate(`/${ESTABLISHMENT.slug}`);
   const goReserve = () => navigate(`/${ESTABLISHMENT.slug}/reservas`);
 
   /* Dados reais do estabelecimento */

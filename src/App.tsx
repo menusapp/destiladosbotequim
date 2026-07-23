@@ -26,8 +26,9 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ESTABLISHMENT } from "@/config/establishment";
 import { MetaPixelRouteTracker } from "@/components/MetaPixelRouteTracker";
 
 const LandingDestilado = lazyWithRetry(() => import("./pages/LandingDestilado"));
@@ -112,7 +113,7 @@ const App = () => (
                 /cardapio (e também no slug). A equipe entra pelo /login.
               */}
               <Route path="/" element={<LandingDestilado />} />
-              <Route path="/cardapio" element={<DeliveryMenu />} />
+              <Route path="/cardapio" element={<Navigate to={`/${ESTABLISHMENT.slug}`} replace />} />
 
               {/* Auth routes */}
               <Route path="/login" element={<RestaurantLogin />} />

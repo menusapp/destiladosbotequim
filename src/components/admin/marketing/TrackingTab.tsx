@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ShoppingCart, Users, UserX, Eye, MessageSquare, TrendingDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
@@ -61,6 +62,9 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
   const [inactiveCustomers, setInactiveCustomers] = useState<InactiveCustomer[]>([]);
   const [noPurchaseCustomers, setNoPurchaseCustomers] = useState<NoPurchaseCustomer[]>([]);
   const [loading, setLoading] = useState(true);
+  // Segmentação do funil: por etapa onde parou e por produto no carrinho
+  const [stepFilter, setStepFilter] = useState<string>("all");
+  const [productFilter, setProductFilter] = useState<string>("all");
 
   useEffect(() => {
     fetchMetrics();
@@ -244,6 +248,26 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
     return session.abandoned_at || session.last_activity;
   };
 
+  // Opções de produto (derivadas dos carrinhos abandonados) e segmentação.
+  const productOptions = (() => {
+    const map = new Map<string, string>();
+    for (const s of abandonedSessions) {
+      for (const it of (Array.isArray(s.cart_items) ? s.cart_items : [])) {
+        if (it?.id) map.set(String(it.id), String(it.name || "Produto"));
+      }
+    }
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  })();
+
+  const filteredSessions = abandonedSessions.filter((s) => {
+    if (stepFilter !== "all" && (s.checkout_step || "") !== stepFilter) return false;
+    if (productFilter !== "all") {
+      const items = Array.isArray(s.cart_items) ? s.cart_items : [];
+      if (!items.some((it: any) => String(it?.id) === productFilter)) return false;
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       {/* Metrics */}
@@ -336,10 +360,37 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
             </Button>
           </div>
 
-          {abandonedSessions.length === 0 ? (
+          {/* Segmentação: filtrar por etapa onde parou e por produto no carrinho */}
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={stepFilter} onValueChange={setStepFilter}>
+              <SelectTrigger className="w-[190px]"><SelectValue placeholder="Etapa" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as etapas</SelectItem>
+                {Object.entries(CHECKOUT_STEP_LABELS).map(([k, label]) => (
+                  <SelectItem key={k} value={k}>Parou em: {label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={productFilter} onValueChange={setProductFilter}>
+              <SelectTrigger className="w-[220px]"><SelectValue placeholder="Produto" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os produtos</SelectItem>
+                {productOptions.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {(stepFilter !== "all" || productFilter !== "all") && (
+              <span className="text-sm text-muted-foreground">
+                {filteredSessions.length} cliente(s) neste segmento
+              </span>
+            )}
+          </div>
+
+          {filteredSessions.length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center text-muted-foreground">
-                Nenhum carrinho abandonado neste período
+                Nenhum carrinho abandonado neste período/segmento
               </CardContent>
             </Card>
           ) : (
@@ -357,14 +408,14 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {abandonedSessions.map((s) => (
+                  {filteredSessions.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell className="font-medium">{s.name || "—"}</TableCell>
                       <TableCell>{s.phone || "—"}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {(Array.isArray(s.cart_items) ? s.cart_items : []).slice(0, 3).map((item: any, i: number) => (
-                            <Badge key={i} variant="secondary" className="text-xs">
+                            <Badge key={i} variant="secondary" className="text-xs" title={item.id ? `hash: ${item.id}` : undefined}>
                               {item.qty}x {item.name}
                             </Badge>
                           ))}

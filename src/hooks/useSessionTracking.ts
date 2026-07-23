@@ -81,7 +81,10 @@ export function useSessionTracking(restaurantId: string | undefined, restaurantS
         return sum + (price + extrasTotal) * item.quantity;
       }, 0);
 
+      // Guarda o id (hash único) de cada produto além do nome, para permitir
+      // rastreabilidade e remarketing segmentado por produto específico.
       const cartSnapshot = cart.map((item) => ({
+        id: item.product.id,
         name: item.product.name,
         qty: item.quantity,
         price: item.product.promotional_price ?? item.product.price,
