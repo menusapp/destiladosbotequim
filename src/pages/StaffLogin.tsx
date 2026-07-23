@@ -168,27 +168,19 @@ const StaffLogin = () => {
     setLoading(true);
 
     try {
-      // Valida credenciais e obtém um token de sessão assinado (identidade
-      // autenticada). A edge function chama validate_staff_credentials com
-      // service_role e assina o JWT com os claims restaurant_id/staff_id/role.
-      const { data: resp, error } = await supabase.functions.invoke("issue-session-token", {
-        body: {
-          type: "staff",
-          restaurant_id: restaurantId,
-          username: username.trim(),
-          password,
-        },
+      // Valida credenciais e cria uma sessão no servidor (token opaco).
+      // O token é enviado no header x-app-token e validado pelo RLS.
+      const { data, error } = await (supabase as any).rpc("create_staff_session", {
+        p_restaurant_id: restaurantId,
+        p_username: username.trim(),
+        p_password: password,
       });
 
       if (error) throw error;
-      if (resp?.error) {
-        toast.error(resp.error);
-        return;
-      }
+      const staff = Array.isArray(data) && data.length > 0 ? data[0] : null;
 
-      if (resp?.token && resp?.data) {
-        const staff = resp.data;
-        setSessionToken(resp.token, resp.expires_at);
+      if (staff?.token) {
+        setSessionToken(staff.token, Math.floor(new Date(staff.expires_at).getTime() / 1000));
         applyRealtimeAuth();
         localStorage.setItem("staff_id", staff.staff_id);
         localStorage.setItem("staff_name", staff.display_name);

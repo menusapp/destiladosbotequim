@@ -22,19 +22,16 @@ const CEOLogin = () => {
     setLoading(true);
 
     try {
-      const { data: resp, error } = await supabase.functions.invoke("issue-session-token", {
-        body: { type: "ceo", username: username.trim(), password },
+      const { data, error } = await (supabase as any).rpc("create_ceo_session", {
+        p_username: username.trim(),
+        p_password: password,
       });
 
       if (error) throw error;
-      if (resp?.error) {
-        toast.error(resp.error);
-        return;
-      }
+      const ceoUser = Array.isArray(data) && data.length > 0 ? data[0] : null;
 
-      if (resp?.token && resp?.data) {
-        const ceoUser = resp.data;
-        setSessionToken(resp.token, resp.expires_at);
+      if (ceoUser?.token) {
+        setSessionToken(ceoUser.token, Math.floor(new Date(ceoUser.expires_at).getTime() / 1000));
         applyRealtimeAuth();
         localStorage.setItem("ceo_user_id", ceoUser.ceo_user_id);
         localStorage.setItem("ceo_display_name", ceoUser.display_name);
