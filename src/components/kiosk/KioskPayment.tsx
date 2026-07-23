@@ -178,20 +178,21 @@ export function KioskPayment({
       const orderData = orderDetails?.table_id != null ? orderDetails : orderDetails?.order;
 
       if (orderData?.table_id) {
-        const { data: comanda, error: comandaError } = await supabase
+        // id gerado no cliente (sem `.select()` de retorno, bloqueado pelo RLS).
+        const comandaId = crypto.randomUUID();
+        const { error: comandaError } = await supabase
           .from("comandas")
           .insert({
+            id: comandaId,
             restaurant_id: restaurant.id,
             table_id: orderData.table_id,
             customer_name: customer.name,
             customer_cpf: customer.cpf || "000.000.000-00",
             status: "active",
-          })
-          .select()
-          .single();
+          });
 
-        if (!comandaError && comanda) {
-          await supabase.from("orders").update({ comanda_id: comanda.id }).eq("id", orderId);
+        if (!comandaError) {
+          await supabase.from("orders").update({ comanda_id: comandaId }).eq("id", orderId);
         }
 
         if (isTablePaid) {
@@ -215,38 +216,14 @@ export function KioskPayment({
     if (restaurant.loyalty_enabled && customer.cpf) {
       const pointsToEarn = Math.floor(finalTotal * (restaurant.loyalty_points_per_real || 1));
       if (pointsToEarn > 0) {
-        const { data: existing } = await supabase
-          .from("loyalty_points")
-          .select("*")
-          .eq("customer_cpf", customer.cpf)
-          .eq("restaurant_id", restaurant.id)
-          .maybeSingle();
-
-        if (existing) {
-          await supabase.from("loyalty_points").update({
-            points_balance: existing.points_balance + pointsToEarn - loyaltyPointsUsed,
-            total_earned: existing.total_earned + pointsToEarn,
-            total_redeemed: (existing.total_redeemed || 0) + loyaltyPointsUsed,
-            last_updated: new Date().toISOString(),
-          }).eq("id", existing.id);
-        } else {
-          await supabase.from("loyalty_points").insert({
-            customer_cpf: customer.cpf,
-            restaurant_id: restaurant.id,
-            points_balance: pointsToEarn - loyaltyPointsUsed,
-            total_earned: pointsToEarn,
-            total_redeemed: loyaltyPointsUsed,
-          });
-        }
-
-        if (pointsToEarn > 0) {
-          await supabase.from("loyalty_transactions").insert({
-            customer_cpf: customer.cpf, restaurant_id: restaurant.id, order_id: orderId, points: pointsToEarn, type: "earn",
-          });
-        }
+        // Fidelidade atômica no servidor (substitui a leitura/escrita direta
+        // de loyalty_points, bloqueada pelo RLS no fluxo anônimo do totem).
+        await (supabase as any).rpc("apply_loyalty", {
+          p_cpf: customer.cpf, p_points: pointsToEarn, p_type: "earn", p_order_id: orderId,
+        });
         if (loyaltyPointsUsed > 0) {
-          await supabase.from("loyalty_transactions").insert({
-            customer_cpf: customer.cpf, restaurant_id: restaurant.id, order_id: orderId, points: -loyaltyPointsUsed, type: "redeem",
+          await (supabase as any).rpc("apply_loyalty", {
+            p_cpf: customer.cpf, p_points: loyaltyPointsUsed, p_type: "redeem", p_order_id: orderId,
           });
         }
       }

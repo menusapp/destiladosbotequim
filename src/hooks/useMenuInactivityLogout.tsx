@@ -17,23 +17,14 @@ export const useMenuInactivityLogout = (
     if (!tableId || !tableNumber || !restaurantSlug) return;
 
     try {
-      // Verificar se há pedidos ou contas ativas para esta mesa
-      const { data: activeOrders } = await supabase
-        .from("orders")
-        .select("id")
-        .eq("table_id", tableId)
-        .in("status", ["pending", "preparing", "ready"])
-        .limit(1);
+      // Verificar se há atividade em aberto (pedidos/contas/comanda) para esta
+      // mesa via RPC segura (o RLS bloqueia a leitura direta no fluxo anônimo).
+      const { data: hasActivity } = await (supabase as any).rpc("table_has_activity", {
+        p_table_id: tableId,
+      });
 
-      const { data: unpaidBills } = await supabase
-        .from("bills")
-        .select("id")
-        .eq("table_id", tableId)
-        .neq("status", "paid")
-        .limit(1);
-
-      // Se houver pedidos ativos ou contas não pagas, não deslogar
-      if ((activeOrders && activeOrders.length > 0) || (unpaidBills && unpaidBills.length > 0)) {
+      // Se houver qualquer atividade em aberto, não deslogar
+      if (hasActivity === true) {
         // Resetar o timer para verificar novamente daqui a 1 hora
         resetTimer();
         return;

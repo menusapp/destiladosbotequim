@@ -84,13 +84,13 @@ export function KioskDeliveryAddress({ primaryColor, customerCpf, customerName, 
         street, number, complement: complement || null,
         neighborhood, city, state: "SP", zip_code: "00000-000",
       };
-      const { data, error } = await supabase
+      // id gerado no cliente (sem `.select()` de retorno, bloqueado pelo RLS).
+      const id = crypto.randomUUID();
+      const { error } = await supabase
         .from("customer_addresses")
-        .insert(newAddr)
-        .select()
-        .single();
+        .insert({ id, ...newAddr });
       if (error) throw error;
-      const addr = data as SavedAddress;
+      const addr = { id, ...newAddr } as SavedAddress;
       onSelectAddress(formatAddress(addr));
     } catch (err: any) {
       toast.error(err?.message || "Erro ao salvar endereço");
