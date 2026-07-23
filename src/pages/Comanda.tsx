@@ -272,28 +272,15 @@ const Comanda = () => {
       if (!comandaId || !savedName) return;
       
       try {
-        // TODO(security): needs table_id to use get_comanda_status RPC here reliably;
-        // left as direct read (comandas) pending a get_comanda_status-by-id RPC variant.
-        const { data: comanda } = await supabase
-          .from("comandas")
-          .select("status")
-          .eq("id", comandaId)
-          .maybeSingle();
-        
+        const { data: comandaRow } = await (supabase as any).rpc('get_comanda_status_by_id', { p_comanda_id: comandaId });
+        const comanda = Array.isArray(comandaRow) ? comandaRow[0] : comandaRow;
+
         if (!comanda || comanda.status === "closed") {
-          
-          // TODO(security): needs RPC - no bills RPC to fetch paid bill id by comanda_id
-          const { data: paidBill } = await supabase
-            .from("bills")
-            .select("id")
-            .eq("comanda_id", comandaId)
-            .eq("status", "paid")
-            .limit(1)
-            .maybeSingle();
-          
-          if (paidBill) {
+          const { data: paidBillId } = await (supabase as any).rpc('get_paid_bill_for_comanda', { p_comanda_id: comandaId });
+
+          if (paidBillId) {
             sessionStorage.setItem('shouldShowReview', 'true');
-            sessionStorage.setItem('reviewBillId', paidBill.id);
+            sessionStorage.setItem('reviewBillId', paidBillId);
           }
           
           sessionStorage.removeItem(`customer_name_${tableNumber}`);
