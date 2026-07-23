@@ -128,12 +128,10 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, 
     const fetchCustomerData = async () => {
       if (customerCPF.length !== 11 || !restaurantId) return;
       
-      const { data: customer } = await supabase
-        .from("customers")
-        .select("name, phone")
-        .eq("restaurant_id", restaurantId)
-        .eq("cpf", customerCPF)
-        .maybeSingle();
+      const { data: customerRows } = await (supabase as any).rpc("get_customer_by_cpf", {
+        p_cpf: customerCPF,
+      });
+      const customer = Array.isArray(customerRows) ? customerRows[0] : customerRows;
       
       if (customer) {
         if (customer.name && !customerName) setCustomerName(customer.name);
@@ -198,11 +196,13 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, 
   }, [deliveryZones]);
 
   const fetchSavedAddresses = async () => {
-    const { data } = await supabase
-      .from("customer_addresses")
-      .select("*")
-      .eq("customer_cpf", customerCPF)
-      .order("is_default", { ascending: false });
+    const { data: rawData } = await (supabase as any).rpc("list_customer_addresses", {
+      p_cpf: customerCPF,
+      p_phone: customerPhone || null,
+    });
+    const data = Array.isArray(rawData)
+      ? [...rawData].sort((a: any, b: any) => (b.is_default === true ? 1 : 0) - (a.is_default === true ? 1 : 0))
+      : rawData;
 
     if (data && data.length > 0) {
       setSavedAddresses(data);

@@ -88,15 +88,16 @@ export const ReservationsView = ({
     if (!restaurant?.id) return;
     setLoading(true);
     try {
-      // Fetch reservations for this customer
-      const { data: resData } = await supabase
-        .from("reservations")
-        .select("id, reservation_date, reservation_time, party_size, status, notes, table_id, created_at")
-        .eq("restaurant_id", restaurant.id)
-        .eq("customer_cpf", customerCPF.replace(/\D/g, ""))
-        .order("created_at", { ascending: false });
+      // Fetch reservations for this customer via RPC
+      const { data: resData } = await (supabase as any).rpc("get_my_reservations", {
+        p_cpf: customerCPF.replace(/\D/g, ""),
+        p_phone: customerPhone ? customerPhone.replace(/\D/g, "") : null,
+      });
 
-      setReservations(resData || []);
+      const sortedRes = [...(resData || [])].sort(
+        (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      setReservations(sortedRes);
 
       // Fetch table names for display
       if (resData && resData.length > 0) {
@@ -153,49 +154,44 @@ export const ReservationsView = ({
     fetchData();
   }, [fetchData]);
 
-  // Realtime subscription for reservation status updates
+  // Polling (15s) for reservation status updates (replaces postgres_changes realtime)
   useEffect(() => {
     if (!restaurant?.id || !customerCPF) return;
 
-    const channel = supabase
-      .channel(`reservations-${customerCPF}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'reservations',
-      }, (payload) => {
-        const updated = payload.new as any;
-        if (updated.customer_cpf === customerCPF.replace(/\D/g, "")) {
-          setReservations(prev =>
-            prev.map(r => r.id === updated.id ? { ...r, status: updated.status } : r)
-          );
-          if (updated.status === 'confirmed') {
-            toast.success("🎉 Sua reserva foi confirmada!");
-          } else if (updated.status === 'cancelled') {
-            toast.error("Sua reserva foi cancelada.");
+    const interval = setInterval(async () => {
+      const { data } = await (supabase as any).rpc("get_my_reservations", {
+        p_cpf: customerCPF.replace(/\D/g, ""),
+        p_phone: customerPhone ? customerPhone.replace(/\D/g, "") : null,
+      });
+      if (!data) return;
+      setReservations(prev => {
+        (data as any[]).forEach((updated: any) => {
+          const prevRes = prev.find(r => r.id === updated.id);
+          if (prevRes && prevRes.status !== updated.status) {
+            if (updated.status === 'confirmed') {
+              toast.success("🎉 Sua reserva foi confirmada!");
+            } else if (updated.status === 'cancelled') {
+              toast.error("Sua reserva foi cancelada.");
+            }
           }
-        }
-      })
-      .subscribe();
+        });
+        return data;
+      });
+    }, 15000);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [restaurant?.id, customerCPF]);
+    return () => clearInterval(interval);
+  }, [restaurant?.id, customerCPF, customerPhone]);
 
-  // Fetch reserved tables when date changes
+  // Fetch reserved tables when date changes via RPC
   useEffect(() => {
     if (!reservationDate || !restaurant?.id) return;
     const dateStr = format(reservationDate, "yyyy-MM-dd");
-    supabase
-      .from("reservations")
-      .select("table_id")
-      .eq("restaurant_id", restaurant.id)
-      .eq("reservation_date", dateStr)
-      .in("status", Array.from(ACTIVE_RESERVATION_STATUSES))
-      .then(({ data }) => {
-        setReservedTableIds((data || []).map(r => r.table_id).filter(Boolean) as string[]);
-      });
+    (supabase as any).rpc("get_reservation_availability", { p_date: dateStr }).then(({ data }: any) => {
+      const reservedIds = (data || [])
+        .filter((r: any) => r.table_id && (r.is_available === false || r.status ? Array.from(ACTIVE_RESERVATION_STATUSES).includes(r.status) : true))
+        .map((r: any) => r.table_id);
+      setReservedTableIds(reservedIds as string[]);
+    });
   }, [reservationDate, restaurant?.id]);
 
   const generateTimeSlots = (date: Date | undefined) => {
@@ -272,14 +268,10 @@ export const ReservationsView = ({
       return;
     }
 
-    const { data: existingReservation } = await supabase
-      .from("reservations")
-      .select("id")
-      .eq("restaurant_id", restaurant.id)
-      .eq("table_id", selectedTable.id)
-      .eq("reservation_date", format(reservationDate, "yyyy-MM-dd"))
-      .in("status", Array.from(ACTIVE_RESERVATION_STATUSES))
-      .maybeSingle();
+    const { data: availabilityData } = await (supabase as any).rpc("get_reservation_availability", {
+      p_date: format(reservationDate, "yyyy-MM-dd"),
+    });
+    const existingReservation = (availabilityData || []).find((r: any) => r.table_id === selectedTable.id);
 
     if (existingReservation) {
       toast.error("Esta mesa já está reservada para esta data. Escolha outra data ou mesa.");

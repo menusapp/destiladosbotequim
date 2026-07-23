@@ -77,60 +77,44 @@ export const ProfileView = ({
   }, [customerCPF, restaurantId]);
 
   const fetchCustomerPhone = async () => {
-    const { data } = await supabase
-      .from("customers")
-      .select("phone, birth_date")
-      .eq("restaurant_id", restaurantId)
-      .eq("cpf", customerCPF)
-      .maybeSingle();
-    if (data?.phone) setPhone(data.phone);
-    if (data?.birth_date) setBirthDate(formatBirthDateForInput(data.birth_date));
+    const { data } = await (supabase as any).rpc("get_customer_by_cpf", { p_cpf: customerCPF });
+    const customer = Array.isArray(data) ? data[0] : data;
+    if (customer?.phone) setPhone(customer.phone);
+    if (customer?.birth_date) setBirthDate(formatBirthDateForInput(customer.birth_date));
   };
 
   const fetchAddresses = async () => {
-    const { data } = await supabase
-      .from("customer_addresses")
-      .select("*")
-      .eq("customer_cpf", customerCPF)
-      .order("is_default", { ascending: false });
-    
-    setAddresses(data || []);
+    const { data } = await (supabase as any).rpc("list_customer_addresses", {
+      p_cpf: customerCPF,
+      p_phone: phone || null,
+    });
+    const sorted = [...(data || [])].sort(
+      (a: any, b: any) => (b.is_default ? 1 : 0) - (a.is_default ? 1 : 0)
+    );
+    setAddresses(sorted);
   };
 
   const fetchCoupons = async () => {
-    // Buscar mensagens de marketing enviadas para este CPF que têm cupom
-    const { data: messages } = await supabase
-      .from("marketing_scheduled_messages")
-      .select("coupon_code")
-      .eq("restaurant_id", restaurantId)
-      .eq("customer_cpf", customerCPF)
-      .eq("status", "sent")
-      .not("coupon_code", "is", null);
+    // Buscar códigos de cupons enviados para este CPF via RPC
+    const { data: codesData } = await (supabase as any).rpc("get_customer_coupons", { p_cpf: customerCPF });
 
-    if (!messages || messages.length === 0) {
-      setCoupons([]);
-      return;
-    }
-
-    // Pegar os códigos únicos dos cupons
-    const couponCodes = [...new Set(messages.map(m => m.coupon_code).filter(Boolean))];
+    const couponCodes = [...new Set((codesData || []).map((c: any) => c.coupon_code).filter(Boolean))] as string[];
 
     if (couponCodes.length === 0) {
       setCoupons([]);
       return;
     }
 
-    // Buscar detalhes dos cupons válidos
-    const now = new Date().toISOString();
-    const { data: validCoupons } = await supabase
-      .from("coupons")
-      .select("*")
-      .eq("restaurant_id", restaurantId)
-      .eq("is_active", true)
-      .in("code", couponCodes)
-      .or(`valid_until.is.null,valid_until.gte.${now}`);
+    // Validar cada cupom individualmente via RPC (retorna apenas cupons ativos/válidos)
+    const results = await Promise.all(
+      couponCodes.map((code) => (supabase as any).rpc("validate_coupon", { p_code: code }))
+    );
 
-    setCoupons(validCoupons || []);
+    const validCoupons = results
+      .flatMap((r) => (Array.isArray(r.data) ? r.data : r.data ? [r.data] : []))
+      .filter(Boolean);
+
+    setCoupons(validCoupons);
   };
 
   const fetchLoyaltyProgram = async () => {
@@ -190,17 +174,11 @@ export const ProfileView = ({
       };
       setLoyaltyProgram(programData);
 
-      // Fetch ALL customer orders since program activation
-      const { data: ordersData, error: ordersError } = await supabase
-        .from("orders")
-        .select(`
-          id, created_at,
-          order_items(price_at_order, quantity, order_item_extras(price_at_order))
-        `)
-        .eq("restaurant_id", restaurantId)
-        .eq("customer_cpf", customerCPF)
-        .in("status", ["delivered", "picked_up", "completed"])
-        .gte("created_at", programActivatedAt);
+      // Fetch ALL customer orders since program activation via RPC
+      const { data: ordersData, error: ordersError } = await (supabase as any).rpc("get_customer_orders", {
+        p_cpf: customerCPF,
+        p_phone: phone || null,
+      });
 
       if (ordersError) throw ordersError;
 
@@ -208,15 +186,20 @@ export const ProfileView = ({
       let purchase_count = 0;
       let total_spent = 0;
 
-      ordersData?.forEach(order => {
-        purchase_count += 1;
-        order.order_items?.forEach((item: any) => {
-          total_spent += item.price_at_order * item.quantity;
-          item.order_item_extras?.forEach((extra: any) => {
-            total_spent += extra.price_at_order;
+      (ordersData || [])
+        .filter((order: any) =>
+          ["delivered", "picked_up", "completed"].includes(order.status) &&
+          order.created_at >= programActivatedAt
+        )
+        .forEach((order: any) => {
+          purchase_count += 1;
+          order.order_items?.forEach((item: any) => {
+            total_spent += item.price_at_order * item.quantity;
+            item.order_item_extras?.forEach((extra: any) => {
+              total_spent += extra.price_at_order;
+            });
           });
         });
-      });
 
       setCustomerProgress({ purchase_count, total_spent });
     } catch (error) {

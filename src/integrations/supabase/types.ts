@@ -5122,6 +5122,7 @@ export type Database = {
       }
       auto_release_idle_tables: { Args: never; Returns: undefined }
       auto_release_inactive_tables: { Args: never; Returns: undefined }
+      check_bill_exists: { Args: { p_bill_id: string }; Returns: string }
       check_mp_token_expiry: {
         Args: { p_restaurant_id: string }
         Returns: {
@@ -5135,6 +5136,10 @@ export type Database = {
         Returns: boolean
       }
       cleanup_abandoned_tables: { Args: never; Returns: undefined }
+      count_active_comandas_for_table: {
+        Args: { p_table_id: string }
+        Returns: number
+      }
       create_kiosk_order: {
         Args: {
           p_coupon_code?: string
@@ -5176,6 +5181,14 @@ export type Database = {
         Returns: {
           closed_at: string
           created_at: string
+          id: string
+          status: string
+          table_id: string
+        }[]
+      }
+      get_comanda_status_by_id: {
+        Args: { p_comanda_id: string }
+        Returns: {
           id: string
           status: string
           table_id: string
@@ -5289,6 +5302,10 @@ export type Database = {
       }
       get_order_details: { Args: { p_order_id: string }; Returns: Json }
       get_order_status: { Args: { p_order_id: string }; Returns: string }
+      get_paid_bill_for_comanda: {
+        Args: { p_comanda_id: string }
+        Returns: string
+      }
       get_payment_status: {
         Args: { p_payment_id: string }
         Returns: {
@@ -5350,6 +5367,15 @@ export type Database = {
           last_four_digits: string
           payment_method_id: string
         }[]
+      }
+      get_table_pending_orders_total: {
+        Args: {
+          p_comanda_id?: string
+          p_customer_cpf?: string
+          p_customer_name?: string
+          p_table_id: string
+        }
+        Returns: number
       }
       get_whatsapp_public_config: {
         Args: { p_restaurant_id: string }

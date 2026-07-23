@@ -91,13 +91,9 @@ export default function Kiosk() {
   // Fetch loyalty points
   useEffect(() => {
     if (!customer?.cpf || !restaurant?.id || !restaurant?.loyalty_enabled) return;
-    supabase.from("loyalty_points")
-      .select("points_balance")
-      .eq("customer_cpf", customer.cpf)
-      .eq("restaurant_id", restaurant.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        setLoyaltyPoints(data?.points_balance || 0);
+    (supabase as any).rpc('get_loyalty_balance', { p_cpf: customer.cpf })
+      .then(({ data }: { data: number | null }) => {
+        setLoyaltyPoints(data || 0);
       });
   }, [customer?.cpf, restaurant?.id, restaurant?.loyalty_enabled]);
 
@@ -350,12 +346,8 @@ export default function Kiosk() {
       setStep("delivery_address");
     } else if (consumptionMode === "counter" && customer?.cpf) {
       // Check if customer has phone for WhatsApp notification
-      const { data: cust } = await supabase
-        .from("customers")
-        .select("phone")
-        .eq("cpf", customer.cpf)
-        .eq("restaurant_id", restaurant.id)
-        .maybeSingle();
+      const { data: custData } = await (supabase as any).rpc('get_customer_by_cpf', { p_cpf: customer.cpf });
+      const cust = Array.isArray(custData) ? custData[0] : custData;
       const hasPhone = !!cust?.phone?.trim();
       if (hasPhone) {
         setCustomer(prev => prev ? { ...prev, phone: cust!.phone! } : prev);

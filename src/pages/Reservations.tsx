@@ -163,14 +163,9 @@ const Reservations = () => {
     
     const dateStr = format(date, "yyyy-MM-dd");
     
-    const { data } = await supabase
-      .from("reservations")
-      .select("table_id")
-      .eq("restaurant_id", restaurant.id)
-      .eq("reservation_date", dateStr)
-      .in("status", Array.from(ACTIVE_RESERVATION_STATUSES));
+    const { data } = await (supabase as any).rpc("get_reservation_availability", { p_date: dateStr });
     
-    setReservedTableIds((data || []).map(r => r.table_id).filter(Boolean) as string[]);
+    setReservedTableIds((data || []).map((r: any) => r.table_id).filter(Boolean) as string[]);
   };
 
   // Atualizar mesas reservadas quando a data mudar
@@ -216,15 +211,11 @@ const Reservations = () => {
       return;
     }
 
-    // Verificar se a mesa já está reservada para essa data
-    const { data: existingReservation } = await supabase
-      .from("reservations")
-      .select("id")
-      .eq("restaurant_id", restaurant.id)
-      .eq("table_id", selectedTable.id)
-      .eq("reservation_date", format(reservationDate, "yyyy-MM-dd"))
-      .in("status", Array.from(ACTIVE_RESERVATION_STATUSES))
-      .maybeSingle();
+    // Verificar se a mesa já está reservada para essa data via RPC
+    const { data: availabilityData } = await (supabase as any).rpc("get_reservation_availability", {
+      p_date: format(reservationDate, "yyyy-MM-dd"),
+    });
+    const existingReservation = (availabilityData || []).find((r: any) => r.table_id === selectedTable.id);
 
     if (existingReservation) {
       toast.error("Esta mesa já está reservada para esta data. Escolha outra data ou mesa.");

@@ -220,12 +220,8 @@ export default function DeliveryMenu() {
     
     // Check if customer exists in database (use saved name, ignore typed name)
     if (sanitizedCPF.length === 11 && restaurant?.id) {
-      const { data: existingCustomer } = await supabase
-        .from("customers")
-        .select("name, phone")
-        .eq("restaurant_id", restaurant.id)
-        .eq("cpf", sanitizedCPF)
-        .maybeSingle();
+      const { data: existingCustomerData } = await (supabase as any).rpc('get_customer_by_cpf', { p_cpf: sanitizedCPF });
+      const existingCustomer = Array.isArray(existingCustomerData) ? existingCustomerData[0] : existingCustomerData;
       
       const finalName = existingCustomer ? existingCustomer.name : name;
       const finalPhone = existingCustomer?.phone || phone;

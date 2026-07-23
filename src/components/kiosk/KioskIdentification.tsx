@@ -51,12 +51,8 @@ export function KioskIdentification({ restaurant, onIdentified, onBack }: Props)
     setChecking(true);
     const t = setTimeout(async () => {
       try {
-        const { data, error } = await supabase
-          .from("customers")
-          .select("name, phone")
-          .eq("restaurant_id", restaurant.id)
-          .eq("cpf", raw)
-          .maybeSingle();
+        const { data: rpcData, error } = await (supabase as any).rpc('get_customer_by_cpf', { p_cpf: raw });
+        const data = Array.isArray(rpcData) ? rpcData[0] : rpcData;
         if (error) {
           console.error("[Kiosk CPF] Erro na busca:", error);
           setExisting(null);

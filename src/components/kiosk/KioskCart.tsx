@@ -44,15 +44,10 @@ export function KioskCart({
     if (!couponCode || !restaurantId) return;
     setValidatingCoupon(true);
     try {
-      const { data, error } = await supabase
-        .from("coupons")
-        .select("*")
-        .eq("code", couponCode.toUpperCase())
-        .eq("restaurant_id", restaurantId)
-        .eq("is_active", true)
-        .maybeSingle();
+      const { data: couponRows, error } = await (supabase as any).rpc('validate_coupon', { p_code: couponCode.toUpperCase() });
+      const data = Array.isArray(couponRows) ? couponRows[0] : couponRows;
 
-      if (error || !data) { toast.error("Cupom inválido"); return; }
+      if (error || !data || data.restaurant_id !== restaurantId || !data.is_active) { toast.error("Cupom inválido"); return; }
       if (data.valid_until && new Date(data.valid_until) < new Date()) { toast.error("Cupom expirado"); return; }
       if (data.usage_limit && data.used_count >= data.usage_limit) { toast.error("Cupom esgotado"); return; }
       if (data.min_order_value && cartTotal < data.min_order_value) { toast.error(`Pedido mínimo: R$ ${data.min_order_value.toFixed(2)}`); return; }
