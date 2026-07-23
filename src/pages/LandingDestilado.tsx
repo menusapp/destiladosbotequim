@@ -333,10 +333,16 @@ const LandingDestilado = () => {
         </div>
       </section>
 
-      {/* ===== GALERIA (pratos reais) ===== */}
-      <section className="relative overflow-hidden px-6 py-24 sm:py-28" style={{ background: C.greenDeep }}>
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-12 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
+      {/* ===== GALERIA horizontal (scroll pin) ===== */}
+      <section
+        ref={reelWrapRef}
+        className="relative"
+        style={{ height: reduceMotion ? "auto" : reelHeight, background: C.greenDeep }}
+      >
+        <div
+          className={`${reduceMotion ? "" : "sticky top-0"} flex h-screen w-full flex-col justify-center overflow-hidden px-6 py-16`}
+        >
+          <div className="mx-auto mb-10 flex w-full max-w-6xl flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
             <Reveal>
               <div>
                 <span className="text-[11px] font-semibold uppercase tracking-[0.4em]" style={{ color: C.gold }}>O balcão</span>
@@ -352,15 +358,29 @@ const LandingDestilado = () => {
             </Reveal>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
-            {reelCards.map((p, i) => (
-              <Reveal key={p.id} delay={(i % 4) * 60}>
-                <ReelCard product={p} />
-              </Reveal>
-            ))}
-          </div>
+          {reduceMotion ? (
+            <div className="mx-auto grid w-full max-w-6xl grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3 lg:grid-cols-4">
+              {reelCards.map((p) => (
+                <ReelCard key={p.id} product={p} />
+              ))}
+            </div>
+          ) : (
+            <div
+              ref={reelTrackRef}
+              className="flex items-center gap-6 pl-[10vw] pr-[40vw] will-change-transform"
+              style={{ transform: "translate3d(0,0,0)" }}
+            >
+              {reelCards.map((p) => (
+                <div key={p.id} className="shrink-0 w-[62vw] sm:w-[42vw] md:w-[32vw] lg:w-[24vw]">
+                  <ReelCard product={p} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
+
+
 
 
       {/* ===== AMBIENTE ===== */}
