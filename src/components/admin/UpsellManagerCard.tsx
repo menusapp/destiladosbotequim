@@ -33,9 +33,16 @@ interface ProductLite {
   promotional_price: number | null;
 }
 
+interface CategoryLite {
+  id: string;
+  name: string;
+}
+
 interface UpsellRule {
   id: string;
-  trigger_product_id: string;
+  trigger_type: "product" | "category";
+  trigger_product_id: string | null;
+  trigger_category_id: string | null;
   upsell_product_id: string;
   discount_type: "percentage" | "fixed";
   discount_value: number;
@@ -46,27 +53,36 @@ export function UpsellManagerCard({ restaurantId }: { restaurantId: string }) {
   const [open, setOpen] = useState(false);
   const [rules, setRules] = useState<UpsellRule[]>([]);
   const [products, setProducts] = useState<ProductLite[]>([]);
+  const [categories, setCategories] = useState<CategoryLite[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Form
+  const [triggerType, setTriggerType] = useState<"product" | "category">("product");
   const [triggerId, setTriggerId] = useState("");
+  const [triggerCategoryId, setTriggerCategoryId] = useState("");
   const [upsellId, setUpsellId] = useState("");
   const [discountType, setDiscountType] = useState<"percentage" | "fixed">("percentage");
   const [discountValue, setDiscountValue] = useState("10");
 
-  const productName = (id: string) => products.find((p) => p.id === id)?.name || "—";
+  const productName = (id: string | null) => products.find((p) => p.id === id)?.name || "—";
+  const categoryName = (id: string | null) => categories.find((c) => c.id === id)?.name || "—";
 
   const fetchAll = async () => {
-    const [rulesRes, productsRes] = await Promise.all([
+    const [rulesRes, productsRes, categoriesRes] = await Promise.all([
       (supabase as any)
         .from("product_upsells")
-        .select("id, trigger_product_id, upsell_product_id, discount_type, discount_value, is_active")
+        .select("id, trigger_type, trigger_product_id, trigger_category_id, upsell_product_id, discount_type, discount_value, is_active")
         .eq("restaurant_id", restaurantId)
         .order("created_at", { ascending: false }),
       supabase
         .from("products")
         .select("id, name, price, promotional_price")
+        .eq("restaurant_id", restaurantId)
+        .order("name"),
+      supabase
+        .from("categories")
+        .select("id, name")
         .eq("restaurant_id", restaurantId)
         .order("name"),
     ]);
@@ -77,6 +93,9 @@ export function UpsellManagerCard({ restaurantId }: { restaurantId: string }) {
           id: p.id, name: p.name, price: p.price, promotional_price: p.promotional_price,
         }))
       );
+    }
+    if (!categoriesRes.error && categoriesRes.data) {
+      setCategories((categoriesRes.data as any[]).map((c) => ({ id: c.id, name: c.name })));
     }
   };
 
@@ -97,23 +116,45 @@ export function UpsellManagerCard({ restaurantId }: { restaurantId: string }) {
 
   const handleSave = async () => {
     const v = parseFloat(discountValue.replace(",", "."));
-    if (!triggerId || !upsellId) {
-      toast.error("Selecione o produto gatilho e o produto da oferta");
+    if (!upsellId) {
+      toast.error("Selecione o produto da oferta");
       return;
     }
-    if (triggerId === upsellId) {
-      toast.error("O produto da oferta deve ser diferente do gatilho");
-      return;
+    if (triggerType === "product") {
+      if (!triggerId) {
+        toast.error("Selecione o produto gatilho");
+        return;
+      }
+      if (triggerId === upsellId) {
+        toast.error("O produto da oferta deve ser diferente do gatilho");
+        return;
+      }
+    } else {
+      if (!triggerCategoryId) {
+        toast.error("Selecione a categoria gatilho");
+        return;
+      }
     }
     if (!Number.isFinite(v) || v <= 0 || (discountType === "percentage" && v >= 100)) {
       toast.error("Desconto inválido");
       return;
     }
+    // Desconto fixo não pode ser maior/igual ao preço do produto ofertado.
+    if (discountType === "fixed") {
+      const p = products.find((x) => x.id === upsellId);
+      const base = p ? (p.promotional_price ?? p.price) : 0;
+      if (base > 0 && v >= base) {
+        toast.error(`O desconto (R$ ${v.toFixed(2)}) não pode ser maior ou igual ao preço do produto (R$ ${base.toFixed(2)})`);
+        return;
+      }
+    }
     setSaving(true);
     try {
       const { error } = await (supabase as any).from("product_upsells").insert({
         restaurant_id: restaurantId,
-        trigger_product_id: triggerId,
+        trigger_type: triggerType,
+        trigger_product_id: triggerType === "product" ? triggerId : null,
+        trigger_category_id: triggerType === "category" ? triggerCategoryId : null,
         upsell_product_id: upsellId,
         discount_type: discountType,
         discount_value: v,
@@ -129,7 +170,8 @@ export function UpsellManagerCard({ restaurantId }: { restaurantId: string }) {
       }
       toast.success("Oferta criada!");
       setDialogOpen(false);
-      setTriggerId(""); setUpsellId(""); setDiscountType("percentage"); setDiscountValue("10");
+      setTriggerType("product"); setTriggerId(""); setTriggerCategoryId("");
+      setUpsellId(""); setDiscountType("percentage"); setDiscountValue("10");
       fetchAll();
     } catch (e: any) {
       toast.error(e.message || "Erro ao salvar oferta");
@@ -195,16 +237,40 @@ export function UpsellManagerCard({ restaurantId }: { restaurantId: string }) {
                   </DialogHeader>
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Produto gatilho (o que o cliente adiciona)</Label>
-                      <Select value={triggerId} onValueChange={setTriggerId}>
-                        <SelectTrigger><SelectValue placeholder="Selecione o produto" /></SelectTrigger>
+                      <Label>Gatilho (o que o cliente adiciona)</Label>
+                      <Select value={triggerType} onValueChange={(v) => setTriggerType(v as any)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {products.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                          ))}
+                          <SelectItem value="product">Um produto específico</SelectItem>
+                          <SelectItem value="category">Qualquer produto de uma categoria</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
+                    {triggerType === "product" ? (
+                      <div className="space-y-2">
+                        <Label>Produto gatilho</Label>
+                        <Select value={triggerId} onValueChange={setTriggerId}>
+                          <SelectTrigger><SelectValue placeholder="Selecione o produto" /></SelectTrigger>
+                          <SelectContent>
+                            {products.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label>Categoria gatilho</Label>
+                        <Select value={triggerCategoryId} onValueChange={setTriggerCategoryId}>
+                          <SelectTrigger><SelectValue placeholder="Selecione a categoria" /></SelectTrigger>
+                          <SelectContent>
+                            {categories.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label>Produto da oferta (aparece com desconto)</Label>
                       <Select value={upsellId} onValueChange={setUpsellId}>
@@ -270,7 +336,9 @@ export function UpsellManagerCard({ restaurantId }: { restaurantId: string }) {
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">
-                        {productName(rule.trigger_product_id)}{" "}
+                        {rule.trigger_type === "category"
+                          ? `Categoria: ${categoryName(rule.trigger_category_id)}`
+                          : productName(rule.trigger_product_id)}{" "}
                         <span className="text-muted-foreground">→</span>{" "}
                         {productName(rule.upsell_product_id)}
                       </p>
