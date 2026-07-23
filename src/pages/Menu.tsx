@@ -258,12 +258,14 @@ const Menu = () => {
       // Verificar se a COMANDA ESPECÍFICA DO CLIENTE foi fechada (não da mesa toda!)
       // Isso evita que pagar uma comanda afete outras comandas na mesma mesa
       if (comandaId) {
-        // Verificar se a comanda do cliente está fechada
-        const { data: clientComanda } = await supabase
-          .from("comandas")
-          .select("status")
-          .eq("id", comandaId)
-          .maybeSingle();
+        // Verificar se a comanda do cliente está fechada via RPC
+        const { data: comandaRows } = await (supabase as any).rpc("get_comanda_status", {
+          p_table_id: currentTableId,
+          p_cpf: currentCustomer.cpf,
+        });
+        const clientComanda = (Array.isArray(comandaRows) ? comandaRows : [comandaRows]).find(
+          (c: any) => c?.id === comandaId
+        );
         
         if (clientComanda?.status === "closed") {
           setHasOpenComanda(false);
@@ -273,6 +275,7 @@ const Menu = () => {
         }
         
         // Verificar se existe bill paga DESTA COMANDA específica
+        // TODO(security): needs RPC - no bills RPC available to check paid status by comanda_id
         const { data: clientPaidBill } = await supabase
           .from("bills")
           .select("id")
@@ -289,6 +292,8 @@ const Menu = () => {
       }
 
       // Buscar apenas pedidos do cliente atual (sessão atual) usando comanda_id se disponível
+      // TODO(security): needs RPC - get_customer_orders does not include order_items with prices,
+      // and comanda-scoped order listing has no dedicated RPC yet. Left as direct read.
       let ordersQuery = supabase
         .from("orders")
         .select(`
@@ -826,12 +831,8 @@ const Menu = () => {
 
     try {
       // Check if customer exists in database - use saved name, ignore typed name
-      const { data: existingCustomer } = await supabase
-        .from("customers")
-        .select("name, phone")
-        .eq("restaurant_id", restaurant.id)
-        .eq("cpf", cleanCpf)
-        .maybeSingle();
+      const { data: customerRows } = await (supabase as any).rpc("get_customer_by_cpf", { p_cpf: cleanCpf });
+      const existingCustomer = Array.isArray(customerRows) ? customerRows[0] : customerRows;
       
       const finalName = existingCustomer ? existingCustomer.name : name;
       const finalPhone = existingCustomer?.phone || phone;
@@ -879,14 +880,13 @@ const Menu = () => {
       }
       
 
-      // Verificar se este cliente já tem comanda ativa nesta mesa
-      const { data: existingComanda } = await supabase
-        .from("comandas")
-        .select("id")
-        .eq("table_id", tableData.id)
-        .eq("customer_cpf", cleanCpf)
-        .eq("status", "active")
-        .maybeSingle();
+      // Verificar se este cliente já tem comanda ativa nesta mesa via RPC
+      const { data: comandaStatusRows } = await (supabase as any).rpc("get_comanda_status", {
+        p_table_id: tableData.id,
+        p_cpf: cleanCpf,
+      });
+      const comandaStatusRow = Array.isArray(comandaStatusRows) ? comandaStatusRows[0] : comandaStatusRows;
+      const existingComanda = comandaStatusRow?.status === "active" ? { id: comandaStatusRow.id } : null;
 
       let comandaId: string | undefined;
 
@@ -915,6 +915,7 @@ const Menu = () => {
       }
 
       // Contar comandas ativas na mesa para atualizar occupied_by
+      // TODO(security): needs RPC - no RPC exists yet to count active comandas per table
       const { count: activeCount } = await supabase
         .from("comandas")
         .select("*", { count: "exact", head: true })
