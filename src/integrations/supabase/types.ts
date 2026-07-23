@@ -4113,6 +4113,33 @@ export type Database = {
         }
         Relationships: []
       }
+      staff_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          restaurant_id: string | null
+          role: string | null
+          staff_id: string | null
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          restaurant_id?: string | null
+          role?: string | null
+          staff_id?: string | null
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          restaurant_id?: string | null
+          role?: string | null
+          staff_id?: string | null
+          token?: string
+        }
+        Relationships: []
+      }
       stock_categories: {
         Row: {
           created_at: string | null
@@ -4822,6 +4849,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _app_token: { Args: never; Returns: string }
       add_customer_address: {
         Args: {
           p_city: string
@@ -5140,6 +5168,15 @@ export type Database = {
         Args: { p_table_id: string }
         Returns: number
       }
+      create_ceo_session: {
+        Args: { p_password: string; p_username: string }
+        Returns: {
+          ceo_user_id: string
+          display_name: string
+          expires_at: string
+          token: string
+        }[]
+      }
       create_kiosk_order: {
         Args: {
           p_coupon_code?: string
@@ -5158,6 +5195,21 @@ export type Database = {
           p_table_number?: number
         }
         Returns: string
+      }
+      create_staff_session: {
+        Args: {
+          p_password: string
+          p_restaurant_id: string
+          p_username: string
+        }
+        Returns: {
+          allowed_sections: Json
+          display_name: string
+          expires_at: string
+          role: string
+          staff_id: string
+          token: string
+        }[]
       }
       cron_ifood_polling_30s: { Args: never; Returns: undefined }
       current_restaurant_id: { Args: never; Returns: string }
