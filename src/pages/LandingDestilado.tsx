@@ -78,6 +78,7 @@ const LandingDestilado = () => {
   const [products, setProducts] = useState<Prod[]>([]);
   const [navSolid, setNavSolid] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [reelWrapHeight, setReelWrapHeight] = useState<string>("100vh");
 
   const heroContentRef = useRef<HTMLDivElement>(null);
   const heroGlowRef = useRef<HTMLDivElement>(null);
@@ -201,14 +202,29 @@ const LandingDestilado = () => {
     };
   }, [reduceMotion, products.length]);
 
+  /* Altura do "pin" = EXATAMENTE o necessário para a galeria passar.
+     Mede a largura real do trilho e define a altura da seção como
+     (1 tela + o quanto sobra pra rolar na horizontal). Sem sobra verde. */
+  useEffect(() => {
+    if (reduceMotion) { setReelWrapHeight("auto"); return; }
+    const measure = () => {
+      const track = reelTrackRef.current;
+      if (!track) return;
+      const extra = Math.max(track.scrollWidth - window.innerWidth, 0);
+      setReelWrapHeight(extra > 8 ? `${Math.round(window.innerHeight + extra)}px` : "100vh");
+    };
+    measure();
+    const t = window.setTimeout(measure, 350); // remede após o layout assentar
+    window.addEventListener("resize", measure);
+    return () => { window.clearTimeout(t); window.removeEventListener("resize", measure); };
+  }, [reduceMotion, products.length]);
+
   const logo = (restaurant?.logo_url as string | undefined) || logoAsset.url;
   const banner = (restaurant?.banner_url || restaurant?.cover_url) as string | undefined || facadeNightAsset.url;
   const ambientPhoto = facadeDayAsset.url;
   const address = (restaurant?.store_address || restaurant?.address) as string | undefined;
   const productsWithImages = products.filter((p) => !!p.image_url);
   const reelCards: Prod[] = productsWithImages.length ? productsWithImages : HOUSE_GALLERY;
-  // altura do "pin" proporcional à quantidade de cartões (mais compacto)
-  const reelHeight = `${100 + Math.max(reelCards.length || 4, 4) * 12}vh`;
 
 
   const pillar = (icon: ReactNode, title: string, text: string, delay: number) => (
@@ -340,7 +356,7 @@ const LandingDestilado = () => {
       <section
         ref={reelWrapRef}
         className="relative"
-        style={{ height: reduceMotion ? "auto" : reelHeight, background: C.greenDeep }}
+        style={{ height: reelWrapHeight, background: C.greenDeep }}
       >
         <div
           className={`${reduceMotion ? "" : "sticky top-0"} flex h-screen w-full flex-col justify-center overflow-hidden px-6 py-16`}
