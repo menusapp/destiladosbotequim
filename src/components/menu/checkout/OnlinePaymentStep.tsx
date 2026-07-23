@@ -102,11 +102,10 @@ export const OnlinePaymentStep = ({
     const fetchSavedCards = async () => {
       setIsLoadingCards(true);
       try {
-        const { data, error } = await supabase
-          .from("customer_cards")
-          .select("*")
-          .eq("customer_cpf", customerCPF.replace(/\D/g, ""))
-          .eq("restaurant_id", restaurantId);
+        const { data, error } = await (supabase as any).rpc("get_saved_cards", {
+          p_cpf: customerCPF.replace(/\D/g, ""),
+          p_phone: null,
+        });
 
         if (!error && data && data.length > 0) {
           setSavedCards(data);
@@ -240,7 +239,10 @@ export const OnlinePaymentStep = ({
 
   const startPolling = (paymentId: string) => {
     pollingRef.current = setInterval(async () => {
-      const { data, error } = await supabase.from("online_payments").select("status").eq("id", paymentId).maybeSingle();
+      const { data: statusRows, error } = await (supabase as any).rpc("get_payment_status", {
+        p_payment_id: paymentId,
+      });
+      const data = Array.isArray(statusRows) ? statusRows[0] : statusRows;
 
       if (!error && data?.status === "confirmed") {
         if (pollingRef.current) clearInterval(pollingRef.current);
@@ -260,7 +262,7 @@ export const OnlinePaymentStep = ({
 
   const handleDeleteCard = async (cardId: string) => {
     try {
-      await supabase.from("customer_cards").delete().eq("id", cardId);
+      await (supabase as any).rpc("delete_saved_card", { p_id: cardId, p_cpf: customerCPF.replace(/\D/g, "") });
       setSavedCards((prev) => prev.filter((c) => c.id !== cardId));
       if (selectedCardId === cardId) {
         setSelectedCardId("new");

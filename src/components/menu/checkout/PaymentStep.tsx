@@ -302,12 +302,10 @@ export const PaymentStep = ({
     if (!cpf) return;
 
     const fetchEmail = async () => {
-      const { data } = await supabase
-        .from("customers")
-        .select("email")
-        .eq("cpf", cpf.replace(/\D/g, ""))
-        .eq("restaurant_id", restaurantId)
-        .maybeSingle();
+      const { data: rows } = await (supabase as any).rpc("get_customer_by_cpf", {
+        p_cpf: cpf.replace(/\D/g, ""),
+      });
+      const data = Array.isArray(rows) ? rows[0] : rows;
       if (data?.email && !customerEmail) {
         setCustomerEmail(data.email);
       }

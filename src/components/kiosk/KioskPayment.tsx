@@ -174,11 +174,8 @@ export function KioskPayment({
     const tableId = consumptionMode === "table" && tableNumber ? true : false;
     if (consumptionMode === "table" && tableId) {
       // Get table_id from order
-      const { data: orderData } = await supabase
-        .from("orders")
-        .select("table_id")
-        .eq("id", orderId)
-        .single();
+      const { data: orderDetails } = await (supabase as any).rpc('get_order_details', { p_order_id: orderId });
+      const orderData = orderDetails?.table_id != null ? orderDetails : orderDetails?.order;
 
       if (orderData?.table_id) {
         const { data: comanda, error: comandaError } = await supabase

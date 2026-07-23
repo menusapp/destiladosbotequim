@@ -19,13 +19,10 @@ export function KioskConfirmation({ orderId, primaryColor, onNewOrder }: Props) 
     if (!orderId) { setDailyNumber(null); return; }
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from("orders")
-        .select("daily_order_number")
-        .eq("id", orderId)
-        .maybeSingle();
-      if (!cancelled && data?.daily_order_number != null) {
-        setDailyNumber(Number(data.daily_order_number));
+      const { data } = await (supabase as any).rpc('get_order_details', { p_order_id: orderId });
+      const dailyOrderNumber = data?.daily_order_number ?? data?.order?.daily_order_number;
+      if (!cancelled && dailyOrderNumber != null) {
+        setDailyNumber(Number(dailyOrderNumber));
       }
     })();
     return () => { cancelled = true; };

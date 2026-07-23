@@ -40,6 +40,9 @@ export const ReviewModal = ({
 
     try {
       // Verificar se a bill ainda existe (pode ter sido deletada)
+      // TODO(security): needs RPC - no existing RPC allows checking a bill by id alone
+      // (get_comanda_status requires p_table_id+p_cpf, not available here). Left as direct
+      // read for now; only returns the id, not sensitive data.
       let validBillId = null;
       if (billId) {
         const { data: billExists } = await supabase

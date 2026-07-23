@@ -76,12 +76,10 @@ const CustomerInfoDialog = ({
 
     const checkExistingCustomer = async () => {
       try {
-        const { data, error } = await supabase
-          .from("customers")
-          .select("name, phone, birth_date")
-          .eq("restaurant_id", restaurantId)
-          .eq("cpf", sanitizedCPF)
-          .maybeSingle();
+        const { data: rows, error } = await (supabase as any).rpc("get_customer_by_cpf", {
+          p_cpf: sanitizedCPF,
+        });
+        const data = Array.isArray(rows) ? rows[0] : rows;
 
         if (!error && data) {
           setExistingCustomer(data);
