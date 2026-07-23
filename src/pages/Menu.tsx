@@ -284,56 +284,17 @@ const Menu = () => {
         }
       }
 
-      // Buscar apenas pedidos do cliente atual (sessão atual) usando comanda_id se disponível
-      // TODO(security): needs RPC - get_customer_orders does not include order_items with prices,
-      // and comanda-scoped order listing has no dedicated RPC yet. Left as direct read.
-      let ordersQuery = supabase
-        .from("orders")
-        .select(`
-          id,
-          status,
-          customer_name,
-          customer_cpf,
-          order_items (
-            quantity,
-            price_at_order,
-            order_item_extras (
-              price_at_order
-            )
-          )
-        `)
-        .eq("table_id", currentTableId)
-        .in("status", ["pending", "accepted", "preparing", "ready"]);
-      
-      // Filtrar por comanda_id se disponível (mais preciso), senão por CPF
-      if (comandaId) {
-        ordersQuery = ordersQuery.eq("comanda_id", comandaId);
-      } else {
-        ordersQuery = ordersQuery
-          .eq("customer_name", currentCustomer.name)
-          .eq("customer_cpf", currentCustomer.cpf);
-      }
-      
-      const { data: orders, error } = await ordersQuery;
+      // Buscar total agregado dos pedidos abertos do cliente atual via RPC segura
+      const { data: ordersTotalRpc } = await (supabase as any).rpc('get_table_pending_orders_total', {
+        p_table_id: currentTableId,
+        p_comanda_id: comandaId || null,
+        p_customer_cpf: currentCustomer.cpf,
+        p_customer_name: currentCustomer.name,
+      });
+      const ordersTotal = Number(ordersTotalRpc) || 0;
 
-      if (error) throw error;
-
-      // Calcular total dos pedidos já enviados
-      let ordersTotal = 0;
-      if (orders && orders.length > 0) {
+      if (ordersTotal > 0) {
         setHasOpenComanda(true);
-        
-        orders.forEach((order: any) => {
-          order.order_items?.forEach((item: any) => {
-            const extrasSum = item.order_item_extras?.reduce((sum: number, extra: any) => sum + extra.price_at_order, 0) || 0;
-            const itemTotal = (item.price_at_order + extrasSum) * item.quantity;
-            ordersTotal += itemTotal;
-          });
-        });
-        
-        // Pegar status do pedido mais recente
-        const latestOrder = orders[orders.length - 1];
-        setComandaStatus(latestOrder.status);
       } else {
         setHasOpenComanda(false);
         setComandaStatus("");
