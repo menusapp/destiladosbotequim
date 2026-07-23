@@ -341,7 +341,7 @@ const CategoriesTab = ({ restaurantId, isRestaurantOpen }: { restaurantId: strin
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/*"
+                      accept="image/*,image/webp,.webp,.jpg,.jpeg,.png,.gif"
                       className="hidden"
                       onChange={handleImageUpload}
                     />
