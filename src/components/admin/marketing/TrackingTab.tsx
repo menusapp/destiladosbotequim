@@ -415,7 +415,7 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {(Array.isArray(s.cart_items) ? s.cart_items : []).slice(0, 3).map((item: any, i: number) => (
-                            <Badge key={i} variant="secondary" className="text-xs" title={item.id ? `hash: ${item.id}` : undefined}>
+                            <Badge key={i} variant="secondary" className="text-xs" title={[item.id ? `hash: ${item.id}` : "", item.pdv_code ? `PDV: ${item.pdv_code}` : ""].filter(Boolean).join(" • ") || undefined}>
                               {item.qty}x {item.name}
                             </Badge>
                           ))}

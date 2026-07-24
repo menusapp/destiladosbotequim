@@ -53,9 +53,9 @@ export function getNextStatus(order: Order): NextStatusResult | null {
 
   switch (order.status) {
     case "pending":
-      // iFood: Confirmar = confirm + startPreparation → move direto p/ "Preparando"
-      if (isIfood) return { status: "preparing", label: "Confirmar" };
-      return { status: "accepted", label: "Confirmar" };
+      // Ao ACEITAR, o pedido já entra em "Preparando" (aceito == em preparo,
+      // um único passo). O cliente recebe a mensagem de pedido confirmado.
+      return { status: "preparing", label: "Aceitar" };
     case "accepted":
       if (isDelivery) return { status: "out_for_delivery", label: "Saiu p/ Entrega" };
       if (isPickup) return { status: "out_for_delivery", label: "Pronto p/ Retirada" };
@@ -105,8 +105,9 @@ export function useOrderStatusAdvance(restaurantId: string) {
   const sendWhatsAppNotification = async (order: Order, newStatus: string, reason?: string) => {
     try {
       let notificationType: string | null = null;
-      if (newStatus === "accepted") notificationType = "order_accepted";
-      else if (newStatus === "preparing") notificationType = "order_preparing";
+      // "aceito" e "preparando" são o mesmo passo (clicar em Aceitar): manda a
+      // mensagem de pedido confirmado em ambos os estados.
+      if (newStatus === "accepted" || newStatus === "preparing") notificationType = "order_accepted";
       else if (newStatus === "out_for_delivery") notificationType = "order_out_for_delivery";
       else if (newStatus === "ready") notificationType = "order_ready_pickup";
       else if (newStatus === "cancelled") notificationType = "order_cancelled";
