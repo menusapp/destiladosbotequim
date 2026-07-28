@@ -31,6 +31,44 @@ interface AddressStepProps {
   primaryColor?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Geocodificação (Nominatim/OpenStreetMap, gratuito) usada pela validação de
+// zona por RAIO NO MAPA. Cache em memória evita repetir a mesma consulta a
+// cada revalidação do endereço.
+// ---------------------------------------------------------------------------
+const geocodeCache = new Map<string, { lat: number; lon: number } | null>();
+
+async function geocodeFirst(params: string): Promise<{ lat: number; lon: number } | null> {
+  if (geocodeCache.has(params)) return geocodeCache.get(params) ?? null;
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=1&${params}`,
+      { headers: { "Accept-Language": "pt-BR" } }
+    );
+    const data = await res.json();
+    const first =
+      Array.isArray(data) && data[0]
+        ? { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) }
+        : null;
+    geocodeCache.set(params, first);
+    return first;
+  } catch {
+    // Falha de rede: não cacheia, tenta de novo na próxima validação.
+    return null;
+  }
+}
+
+/** Distância em km entre dois pontos (fórmula de Haversine). */
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
 
 export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, primaryColor }: AddressStepProps) => {
   const [customerName, setCustomerName] = useState("");
@@ -184,9 +222,47 @@ export const AddressStep = ({ onBack, onContinue, restaurantSlug, restaurantId, 
         setZoneError(null);
         return true;
       }
-      
-      // Zonas de raio desabilitadas temporariamente - ignorar
-      
+
+      // Zonas por RAIO NO MAPA: geocodifica o endereço do cliente
+      // (CEP → bairro → cidade, via Nominatim/OSM, gratuito) e confere se a
+      // distância até o centro de alguma zona cabe no raio configurado.
+      const radiusZones = deliveryZones.filter(
+        (z) =>
+          z.zone_type === "radius" &&
+          z.center_lat != null &&
+          z.center_lng != null &&
+          z.radius_km != null
+      );
+      if (radiusZones.length > 0) {
+        const attempts: string[] = [];
+        if (cleanZip.length === 8) attempts.push(`country=Brazil&postalcode=${cleanZip}`);
+        if (neighborhood && city)
+          attempts.push(`q=${encodeURIComponent(`${neighborhood}, ${city}${state ? ` - ${state}` : ""}, Brasil`)}`);
+        if (city) attempts.push(`q=${encodeURIComponent(`${city}${state ? ` - ${state}` : ""}, Brasil`)}`);
+
+        let point: { lat: number; lon: number } | null = null;
+        for (const params of attempts) {
+          point = await geocodeFirst(params);
+          if (point) break;
+        }
+
+        if (point) {
+          const matches = radiusZones
+            .filter(
+              (z) =>
+                haversineKm(point!.lat, point!.lon, Number(z.center_lat), Number(z.center_lng)) <=
+                Number(z.radius_km)
+            )
+            // Várias zonas cobrindo o ponto → fica a de menor taxa (melhor p/ cliente)
+            .sort((a, b) => Number(a.delivery_fee || 0) - Number(b.delivery_fee || 0));
+          if (matches.length > 0) {
+            setMatchedZone(matches[0]);
+            setZoneError(null);
+            return true;
+          }
+        }
+      }
+
       setMatchedZone(null);
       setZoneError("Não entregamos nessa região. Por favor, escolha retirada no estabelecimento.");
       return false;

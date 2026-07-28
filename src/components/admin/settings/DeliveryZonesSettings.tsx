@@ -276,15 +276,13 @@ const DeliveryZonesSettings = ({ restaurantId }: { restaurantId: string }) => {
                       value="radius"
                       id="zone-type-radius"
                       className="peer sr-only"
-                      disabled
                     />
                     <Label
                       htmlFor="zone-type-radius"
-                      className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-muted/50 p-4 cursor-not-allowed opacity-60"
+                      className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"
                     >
-                      <CircleDot className="mb-2 h-6 w-6 text-muted-foreground" />
-                      <span className="text-sm font-medium text-muted-foreground">Raio no Mapa</span>
-                      <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded mt-1">Em breve</span>
+                      <CircleDot className="mb-2 h-6 w-6" />
+                      <span className="text-sm font-medium">Raio no Mapa</span>
                     </Label>
                   </div>
                 </RadioGroup>
