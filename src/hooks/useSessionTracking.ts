@@ -140,11 +140,31 @@ export function useSessionTracking(restaurantId: string | undefined, restaurantS
     [upsertSession]
   );
 
+  // Cupom aplicado/removido no checkout (null limpa) — visível no Rastreamento.
+  const trackCoupon = useCallback(
+    (code: string | null) => {
+      upsertSession({ coupon_code: code }, true);
+    },
+    [upsertSession]
+  );
+
+  // Endereço informado + tipo de entrega — visível no Rastreamento.
+  const trackAddress = useCallback(
+    (address: string | null, deliveryType?: string) => {
+      const fields: Record<string, any> = { delivery_address: address };
+      if (deliveryType) fields.delivery_type = deliveryType;
+      upsertSession(fields, true);
+    },
+    [upsertSession]
+  );
+
   return {
     trackCartUpdate,
     trackCheckoutStarted,
     trackCheckoutStep,
     trackCompleted,
     trackCustomerInfo,
+    trackCoupon,
+    trackAddress,
   };
 }

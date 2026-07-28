@@ -49,8 +49,14 @@ interface UpsellRule {
   is_active: boolean;
 }
 
-export function UpsellManagerCard({ restaurantId }: { restaurantId: string }) {
-  const [open, setOpen] = useState(false);
+export function UpsellManagerCard({
+  restaurantId,
+  defaultOpen = false,
+}: {
+  restaurantId: string;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   const [rules, setRules] = useState<UpsellRule[]>([]);
   const [products, setProducts] = useState<ProductLite[]>([]);
   const [categories, setCategories] = useState<CategoryLite[]>([]);

@@ -4,6 +4,7 @@ import ProductsGrid from "./ProductsGrid";
 import ComplementosTab from "./ComplementosTab";
 import CategoriesTab from "./CategoriesTab";
 import DestaquesTab from "./DestaquesTab";
+import { UpsellManagerCard } from "./UpsellManagerCard";
 import MenuDigitizerDialog, { type ImportMode } from "./MenuDigitizerDialog";
 import ImportIfoodDialog from "./ImportIfoodDialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -89,11 +90,17 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen: _isRestaurantOpen }: Card
           >
             Complementos
           </TabsTrigger>
-          <TabsTrigger 
+          <TabsTrigger
             value="destaques"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6 py-3 font-medium"
           >
             Destaques
+          </TabsTrigger>
+          <TabsTrigger
+            value="sacola"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-6 py-3 font-medium"
+          >
+            Ofertas da Sacola
           </TabsTrigger>
         </TabsList>
 
@@ -118,6 +125,10 @@ const CardapioTab = ({ restaurantId, isRestaurantOpen: _isRestaurantOpen }: Card
 
         <TabsContent value="destaques" className="mt-6">
           <DestaquesTab restaurantId={restaurantId} />
+        </TabsContent>
+
+        <TabsContent value="sacola" className="mt-6">
+          <UpsellManagerCard restaurantId={restaurantId} defaultOpen />
         </TabsContent>
       </Tabs>
     </div>

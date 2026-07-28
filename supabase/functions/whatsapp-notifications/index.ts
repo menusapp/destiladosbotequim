@@ -41,7 +41,8 @@ Deno.serve(async (req) => {
       .eq('restaurant_id', restaurant_id)
       .maybeSingle();
 
-    if (!waConfig?.enabled || waConfig?.instance_status !== 'connected') {
+    const waConnected = waConfig?.instance_status === 'connected' || waConfig?.instance_status === 'open';
+    if (!waConfig?.enabled || !waConnected) {
       return new Response(
         JSON.stringify({ success: false, reason: 'whatsapp_not_connected' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

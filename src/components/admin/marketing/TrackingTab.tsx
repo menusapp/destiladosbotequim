@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShoppingCart, Users, UserX, Eye, MessageSquare, TrendingDown } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ShoppingCart, Users, UserX, Eye, MessageSquare, TrendingDown, MapPin, Ticket } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -25,6 +26,10 @@ interface AbandonedSession {
   last_activity: string | null;
   status: string;
   checkout_step: string | null;
+  created_at?: string | null;
+  coupon_code?: string | null;
+  delivery_address?: string | null;
+  delivery_type?: string | null;
 }
 
 // Rótulo amigável da etapa do funil em que o cliente parou.
@@ -65,6 +70,8 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
   // Segmentação do funil: por etapa onde parou e por produto no carrinho
   const [stepFilter, setStepFilter] = useState<string>("all");
   const [productFilter, setProductFilter] = useState<string>("all");
+  // Sessão selecionada para a visão detalhada (dialog).
+  const [detailSession, setDetailSession] = useState<AbandonedSession | null>(null);
 
   useEffect(() => {
     fetchMetrics();
@@ -124,7 +131,7 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
       const [abandonedRes, potentialRes] = await Promise.all([
         supabase
           .from("customer_sessions" as any)
-          .select("id, name, phone, cart_items, cart_value, abandoned_at, last_activity, status, checkout_step")
+          .select("id, name, phone, cart_items, cart_value, abandoned_at, last_activity, status, checkout_step, created_at, coupon_code, delivery_address, delivery_type")
           .eq("restaurant_id", restaurantId)
           .eq("status", "abandoned")
           .gte("abandoned_at", since.toISOString())
@@ -132,7 +139,7 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
           .limit(100) as any,
         supabase
           .from("customer_sessions" as any)
-          .select("id, name, phone, cart_items, cart_value, abandoned_at, last_activity, status, checkout_step")
+          .select("id, name, phone, cart_items, cart_value, abandoned_at, last_activity, status, checkout_step, created_at, coupon_code, delivery_address, delivery_type")
           .eq("restaurant_id", restaurantId)
           .in("status", ["cart_added", "checkout_started"])
           .lt("last_activity", thirtyMinAgo)
@@ -409,7 +416,12 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
                 </TableHeader>
                 <TableBody>
                   {filteredSessions.map((s) => (
-                    <TableRow key={s.id}>
+                    <TableRow
+                      key={s.id}
+                      className="cursor-pointer"
+                      onClick={() => setDetailSession(s)}
+                      title="Clique para ver os detalhes completos"
+                    >
                       <TableCell className="font-medium">{s.name || "—"}</TableCell>
                       <TableCell>{s.phone || "—"}</TableCell>
                       <TableCell>
@@ -554,6 +566,110 @@ export function TrackingTab({ restaurantId, onCreateCampaign }: TrackingTabProps
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Detalhe completo da sessão: cliente, etapa, itens, cupom, endereço */}
+      <Dialog open={!!detailSession} onOpenChange={(open) => !open && setDetailSession(null)}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalhes da sessão</DialogTitle>
+          </DialogHeader>
+          {detailSession && (
+            <div className="space-y-4 text-sm">
+              {/* Cliente */}
+              <div className="rounded-lg border p-3 space-y-1">
+                <p className="font-semibold">{detailSession.name || "Cliente não identificado"}</p>
+                <p className="text-muted-foreground">{detailSession.phone || "Sem telefone"}</p>
+                <p className="text-xs text-muted-foreground break-all">ID da sessão: {detailSession.id}</p>
+              </div>
+
+              {/* Funil */}
+              <div className="flex flex-wrap items-center gap-2">
+                {detailSession.status === "abandoned" ? (
+                  <Badge variant="destructive">Abandonado</Badge>
+                ) : detailSession.status === "completed" ? (
+                  <Badge className="bg-green-600">Concluído</Badge>
+                ) : (
+                  <Badge variant="outline" className="border-orange-400 text-orange-600">Potencial abandono</Badge>
+                )}
+                <Badge variant="outline" className="border-blue-400 text-blue-600">
+                  Parou em: {detailSession.checkout_step
+                    ? (CHECKOUT_STEP_LABELS[detailSession.checkout_step] || detailSession.checkout_step)
+                    : "Navegando no cardápio"}
+                </Badge>
+                {detailSession.delivery_type && (
+                  <Badge variant="secondary">
+                    {detailSession.delivery_type === "pickup" ? "Retirada" : "Entrega"}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Itens da sacola */}
+              <div>
+                <p className="font-semibold mb-2">
+                  Sacola — R$ {Number(detailSession.cart_value || 0).toFixed(2).replace(".", ",")}
+                </p>
+                {(Array.isArray(detailSession.cart_items) ? detailSession.cart_items : []).length === 0 ? (
+                  <p className="text-muted-foreground">Sacola vazia.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {(detailSession.cart_items as any[]).map((item: any, i: number) => (
+                      <div key={i} className="rounded-lg border p-2">
+                        <p className="font-medium">
+                          {item.qty}x {item.name || "Produto"}
+                          {item.price != null && (
+                            <span className="text-muted-foreground font-normal">
+                              {" "}— R$ {Number(item.price).toFixed(2).replace(".", ",")}
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-muted-foreground break-all">
+                          hash: {item.id || "—"}
+                          {item.pdv_code ? ` • PDV: ${item.pdv_code}` : ""}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Cupom / desconto */}
+              <div className="flex items-start gap-2">
+                <Ticket className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <p>
+                  {detailSession.coupon_code
+                    ? <>Cupom aplicado: <b>{detailSession.coupon_code}</b></>
+                    : "Nenhum cupom aplicado."}
+                </p>
+              </div>
+
+              {/* Endereço */}
+              <div className="flex items-start gap-2">
+                <MapPin className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <p>
+                  {detailSession.delivery_address
+                    ? detailSession.delivery_address
+                    : detailSession.delivery_type === "pickup"
+                      ? "Retirada no balcão (sem endereço)."
+                      : "Não chegou a informar o endereço."}
+                </p>
+              </div>
+
+              {/* Tempos */}
+              <div className="text-xs text-muted-foreground space-y-0.5">
+                {detailSession.created_at && (
+                  <p>Iniciou {formatDistanceToNow(new Date(detailSession.created_at), { locale: ptBR, addSuffix: true })}</p>
+                )}
+                {detailSession.last_activity && (
+                  <p>Última atividade {formatDistanceToNow(new Date(detailSession.last_activity), { locale: ptBR, addSuffix: true })}</p>
+                )}
+                {detailSession.abandoned_at && (
+                  <p>Marcado como abandonado {formatDistanceToNow(new Date(detailSession.abandoned_at), { locale: ptBR, addSuffix: true })}</p>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -43,7 +43,7 @@ export default function DeliveryMenu() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<"menu" | "pedidos" | "reservas" | "perfil">("menu");
   const [pendingTab, setPendingTab] = useState<"pedidos" | "reservas" | "perfil" | null>(null);
-  const { trackCartUpdate, trackCheckoutStarted, trackCheckoutStep, trackCompleted, trackCustomerInfo } = useSessionTracking(restaurant?.id, restaurantSlug);
+  const { trackCartUpdate, trackCheckoutStarted, trackCheckoutStep, trackCompleted, trackCustomerInfo, trackCoupon, trackAddress } = useSessionTracking(restaurant?.id, restaurantSlug);
   const { data: inactiveData } = useInactiveStockItems(restaurant?.id || null);
   useFacebookPixel(restaurant?.facebook_pixel_id);
   useDynamicFavicon(restaurant?.logo_url, restaurant?.name);
@@ -571,6 +571,8 @@ export default function DeliveryMenu() {
             onAddRewardItem={(item) => setCart(prev => [...prev, item])}
             customerCPF={customerCPF}
             onCheckoutStep={trackCheckoutStep}
+            onCouponApplied={trackCoupon}
+            onAddressSelected={trackAddress}
             onSuggestionClick={(product) => {
               setCheckoutOpen(false);
               handleProductClick(product);

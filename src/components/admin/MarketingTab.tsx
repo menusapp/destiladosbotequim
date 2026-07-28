@@ -36,14 +36,27 @@ export default function MarketingTab({ restaurantId, onNavigateToWhatsApp }: Mar
 
   const checkWhatsAppStatus = async () => {
     try {
-      const { data, error } = await supabase
-        .rpc("admin_get_whatsapp_status", { p_restaurant_id: restaurantId });
+      // Leitura direta da config (a RLS de staff via x-app-token permite).
+      // A RPC admin_get_whatsapp_status não é usada aqui porque no modelo de
+      // sessão por token ela pode estar indisponível para o papel anon —
+      // o que fazia este check falhar e mostrar o alerta vermelho mesmo com
+      // o WhatsApp conectado.
+      const { data, error } = await (supabase as any)
+        .from("whatsapp_config")
+        .select("enabled, instance_status")
+        .eq("restaurant_id", restaurantId)
+        .order("enabled", { ascending: false })
+        .limit(1);
 
       if (error) throw error;
 
-      if (data && data.length > 0) {
-        setWhatsappEnabled(true);
-        setWhatsappConnected(data[0].instance_status === "connected" || data[0].instance_status === "open");
+      const cfg = Array.isArray(data) ? data[0] : data;
+      if (cfg) {
+        const connected = cfg.instance_status === "connected" || cfg.instance_status === "open";
+        // Instância conectada conta como pronto mesmo se o flag enabled ainda
+        // não foi salvo (ele é auto-ligado na conexão a partir de agora).
+        setWhatsappEnabled(cfg.enabled === true || connected);
+        setWhatsappConnected(connected);
       } else {
         setWhatsappEnabled(false);
         setWhatsappConnected(false);

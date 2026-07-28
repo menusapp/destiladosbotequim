@@ -62,15 +62,25 @@ Deno.serve(async (req) => {
 
     if (!config.enabled) {
       return new Response(
-        JSON.stringify({ error: 'WhatsApp is disabled for this restaurant' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: 'whatsapp_disabled', message: 'O WhatsApp está desativado para este restaurante. Reconecte em Configurações → Notificações WhatsApp.' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    if (config.instance_status !== 'connected') {
+    // Evolution API usa 'open' para conectado; o normalizador grava 'connected',
+    // mas aceitamos ambos por segurança.
+    if (config.instance_status !== 'connected' && config.instance_status !== 'open') {
       return new Response(
-        JSON.stringify({ error: 'WhatsApp instance is not connected' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: 'not_connected', message: `A instância do WhatsApp não está conectada (status: ${config.instance_status || 'desconhecido'}). Abra Configurações → Notificações WhatsApp para reconectar.` }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
+      console.error('[SEND] EVOLUTION_API_URL/EVOLUTION_API_KEY não configuradas');
+      return new Response(
+        JSON.stringify({ success: false, error: 'evolution_env_missing', message: 'Servidor sem EVOLUTION_API_URL/EVOLUTION_API_KEY configuradas (secrets das edge functions).' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 

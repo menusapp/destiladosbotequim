@@ -483,14 +483,25 @@ const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
     try {
       const response = await fetch(`${SUPABASE_URL}/functions/v1/whatsapp-send`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ restaurantId, phone, message: '🧪 Mensagem de teste do sistema Menus!', messageType: 'test' })
+        body: JSON.stringify({ restaurantId, phone, message: '🧪 Mensagem de teste do sistema!', messageType: 'test' })
       });
-      const data = await response.json();
-      if (data.success) toast({ title: "Enviado", description: "Mensagem de teste enviada" });
-      else throw new Error(data.error);
-    } catch (error) {
+      let data: any = null;
+      try { data = await response.json(); } catch { /* corpo não-JSON */ }
+      if (data?.success) {
+        toast({ title: "Enviado", description: "Mensagem de teste enviada" });
+      } else {
+        // Mostra o motivo REAL devolvido pelo servidor (antes o toast era
+        // genérico e escondia a causa: instância, enabled, secrets, etc).
+        const reason = data?.message || data?.error || `Erro HTTP ${response.status}`;
+        throw new Error(reason);
+      }
+    } catch (error: any) {
       console.error('Error sending test:', error);
-      toast({ title: "Erro", description: "Falha ao enviar mensagem de teste", variant: "destructive" });
+      toast({
+        title: "Falha ao enviar mensagem de teste",
+        description: error?.message || "Erro desconhecido — veja o console do navegador.",
+        variant: "destructive",
+      });
     }
   };
 

@@ -60,6 +60,10 @@ interface CheckoutDrawerProps {
   onSuggestionClick?: (product: any) => void;
   onRequireLogin?: () => void;
   onCheckoutStep?: (stepId: string) => void;
+  /** Rastreio do funil: cupom aplicado/removido no checkout. */
+  onCouponApplied?: (code: string | null) => void;
+  /** Rastreio do funil: endereço informado + tipo de entrega. */
+  onAddressSelected?: (address: string | null, deliveryType?: string) => void;
 }
 
 const primaryColorFromRestaurant = (restaurant: any) => restaurant?.primary_color || "#fe9516";
@@ -78,6 +82,8 @@ export const CheckoutDrawer = ({
   onSuggestionClick,
   onRequireLogin,
   onCheckoutStep,
+  onCouponApplied,
+  onAddressSelected,
 }: CheckoutDrawerProps) => {
   const navigate = useNavigate();
   const [step, setStep] = useState<CheckoutStep>("cart");
@@ -557,8 +563,10 @@ export const CheckoutDrawer = ({
         onAddRewardItem(freeCartItem);
       }
     }
-    
+
     setCoupon(couponData);
+    // Rastreio do funil: registra o cupom na sessão do cliente.
+    onCouponApplied?.(couponData?.code ?? null);
   };
 
   // Get customer CPF from prop or sessionStorage
@@ -609,6 +617,8 @@ export const CheckoutDrawer = ({
               if (deliveryType === "delivery") {
                 setStep("address");
               } else {
+                // Retirada: sem endereço, mas registra o tipo no funil.
+                onAddressSelected?.(null, deliveryType);
                 setStep("payment");
               }
             }}
@@ -623,12 +633,18 @@ export const CheckoutDrawer = ({
             onContinue={(data) => {
               setCustomerData({ name: data.customerName, cpf: data.customerCPF, phone: data.customerPhone });
               setAddressData(data);
-              
+
+              // Rastreio do funil: registra o endereço informado na sessão.
+              onAddressSelected?.(
+                data?.address ? formatAddress(data.address) : null,
+                deliveryType
+              );
+
               // Salvar zona de entrega encontrada
               if (data.deliveryZone) {
                 setDeliveryZone(data.deliveryZone);
               }
-              
+
               setStep("payment");
               
               if (restaurant.loyalty_enabled && data.customerCPF) {
