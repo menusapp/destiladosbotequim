@@ -3278,7 +3278,9 @@ export type Database = {
           id: string
           is_active: boolean
           restaurant_id: string
-          trigger_product_id: string
+          trigger_category_id: string | null
+          trigger_product_id: string | null
+          trigger_type: string
           updated_at: string
           upsell_product_id: string
         }
@@ -3289,7 +3291,9 @@ export type Database = {
           id?: string
           is_active?: boolean
           restaurant_id: string
-          trigger_product_id: string
+          trigger_category_id?: string | null
+          trigger_product_id?: string | null
+          trigger_type?: string
           updated_at?: string
           upsell_product_id: string
         }
@@ -3300,7 +3304,9 @@ export type Database = {
           id?: string
           is_active?: boolean
           restaurant_id?: string
-          trigger_product_id?: string
+          trigger_category_id?: string | null
+          trigger_product_id?: string | null
+          trigger_type?: string
           updated_at?: string
           upsell_product_id?: string
         }
@@ -3310,6 +3316,13 @@ export type Database = {
             columns: ["restaurant_id"]
             isOneToOne: false
             referencedRelation: "restaurants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_upsells_trigger_category_id_fkey"
+            columns: ["trigger_category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
             referencedColumns: ["id"]
           },
           {
@@ -4870,6 +4883,10 @@ export type Database = {
         Args: { p_order_item_id: string; p_restaurant_id: string }
         Returns: undefined
       }
+      admin_cancel_order_item_secured_impl_17473: {
+        Args: { p_order_item_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
       admin_check_has_staff: {
         Args: { p_restaurant_id: string }
         Returns: boolean
@@ -4896,6 +4913,17 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_create_staff_secured_impl_17476: {
+        Args: {
+          p_allowed_sections: string
+          p_display_name: string
+          p_password_hash: string
+          p_restaurant_id: string
+          p_role: string
+          p_username: string
+        }
+        Returns: undefined
+      }
       admin_delete_bill: {
         Args: { p_bill_id: string; p_restaurant_id: string }
         Returns: undefined
@@ -4904,7 +4932,19 @@ export type Database = {
         Args: { p_bill_id: string; p_restaurant_id: string }
         Returns: undefined
       }
+      admin_delete_bill_and_orders_secured_impl_17478: {
+        Args: { p_bill_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
+      admin_delete_bill_secured_impl_17477: {
+        Args: { p_bill_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
       admin_delete_category: {
+        Args: { p_category_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
+      admin_delete_category_secured_impl_17479: {
         Args: { p_category_id: string; p_restaurant_id: string }
         Returns: undefined
       }
@@ -4917,11 +4957,27 @@ export type Database = {
         Args: { p_order_id: string; p_restaurant_id: string }
         Returns: undefined
       }
+      admin_delete_order_and_bill_secured_impl_17482: {
+        Args: { p_order_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
+      admin_delete_order_secured_impl_17481: {
+        Args: { p_order_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
       admin_delete_payment_config: {
         Args: { p_restaurant_id: string }
         Returns: undefined
       }
+      admin_delete_payment_config_secured_impl_17483: {
+        Args: { p_restaurant_id: string }
+        Returns: undefined
+      }
       admin_delete_point_terminal: {
+        Args: { p_device_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
+      admin_delete_point_terminal_secured_impl_17484: {
         Args: { p_device_id: string; p_restaurant_id: string }
         Returns: undefined
       }
@@ -4933,7 +4989,19 @@ export type Database = {
         Args: { p_product_extra_id: string; p_restaurant_id: string }
         Returns: undefined
       }
+      admin_delete_product_extra_secured_impl_17486: {
+        Args: { p_product_extra_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
+      admin_delete_product_secured_impl_17485: {
+        Args: { p_product_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
       admin_delete_staff: {
+        Args: { p_restaurant_id: string; p_staff_id: string }
+        Returns: boolean
+      }
+      admin_delete_staff_secured_impl_17487: {
         Args: { p_restaurant_id: string; p_staff_id: string }
         Returns: boolean
       }
@@ -4941,11 +5009,23 @@ export type Database = {
         Args: { p_restaurant_id: string; p_stock_item_id: string }
         Returns: undefined
       }
+      admin_delete_stock_item_secured_impl_17488: {
+        Args: { p_restaurant_id: string; p_stock_item_id: string }
+        Returns: undefined
+      }
       admin_ensure_payment_config: {
         Args: { p_restaurant_id: string }
         Returns: string
       }
+      admin_ensure_payment_config_secured_impl_17489: {
+        Args: { p_restaurant_id: string }
+        Returns: string
+      }
       admin_get_dd_config: { Args: { p_restaurant_id: string }; Returns: Json }
+      admin_get_dd_config_secured_impl_17490: {
+        Args: { p_restaurant_id: string }
+        Returns: Json
+      }
       admin_get_fiscal_config: {
         Args: { p_restaurant_id: string }
         Returns: Json
@@ -4954,7 +5034,29 @@ export type Database = {
         Args: { p_restaurant_id: string }
         Returns: Json
       }
+      admin_get_ifood_config_secured_impl_17492: {
+        Args: { p_restaurant_id: string }
+        Returns: Json
+      }
       admin_get_payment_config: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          accept_card: boolean
+          accept_pix: boolean
+          connected_at: string
+          connection_status: string
+          enable_for_delivery: boolean
+          enabled: boolean
+          id: string
+          mp_access_token: string
+          mp_public_key: string
+          mp_refresh_token: string
+          mp_sandbox_payer_email: string
+          provider: string
+          restaurant_id: string
+        }[]
+      }
+      admin_get_payment_config_secured_impl_17493: {
         Args: { p_restaurant_id: string }
         Returns: {
           accept_card: boolean
@@ -5003,7 +5105,37 @@ export type Database = {
           use_on_kiosk: boolean
         }[]
       }
+      admin_get_point_terminals_secured_impl_17495: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          configured_by: string
+          created_at: string
+          device_id: string
+          device_name: string
+          id: string
+          is_active: boolean
+          is_default_terminal: boolean
+          last_seen_at: string
+          mp_external_pos_id: string
+          mp_external_store_id: string
+          mp_pos_id: string
+          mp_store_id: string
+          operating_mode: string
+          restaurant_id: string
+          terminal_metadata: Json
+          totem_id: string
+          updated_at: string
+          use_on_kiosk: boolean
+        }[]
+      }
       admin_get_whatsapp_status: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          enabled: boolean
+          instance_status: string
+        }[]
+      }
+      admin_get_whatsapp_status_secured_impl_17496: {
         Args: { p_restaurant_id: string }
         Returns: {
           enabled: boolean
@@ -5034,7 +5166,25 @@ export type Database = {
           username: string
         }[]
       }
+      admin_list_staff_secured_impl_17498: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          allowed_sections: Json
+          can_manage_orders: boolean
+          created_at: string
+          display_name: string
+          id: string
+          is_active: boolean
+          receives_order_notifications: boolean
+          role: string
+          username: string
+        }[]
+      }
       admin_mark_bill_on_the_way: {
+        Args: { p_bill_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
+      admin_mark_bill_on_the_way_secured_impl_17499: {
         Args: { p_bill_id: string; p_restaurant_id: string }
         Returns: undefined
       }
@@ -5042,7 +5192,15 @@ export type Database = {
         Args: { p_bill_id: string; p_restaurant_id: string }
         Returns: undefined
       }
+      admin_mark_bill_paid_secured_impl_17500: {
+        Args: { p_bill_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
       admin_toggle_dd: {
+        Args: { p_enabled: boolean; p_restaurant_id: string }
+        Returns: undefined
+      }
+      admin_toggle_dd_secured_impl_17501: {
         Args: { p_enabled: boolean; p_restaurant_id: string }
         Returns: undefined
       }
@@ -5050,7 +5208,15 @@ export type Database = {
         Args: { p_enabled: boolean; p_restaurant_id: string }
         Returns: undefined
       }
+      admin_toggle_ifood_secured_impl_17502: {
+        Args: { p_enabled: boolean; p_restaurant_id: string }
+        Returns: undefined
+      }
       admin_toggle_staff_active: {
+        Args: { p_restaurant_id: string; p_staff_id: string }
+        Returns: boolean
+      }
+      admin_toggle_staff_active_secured_impl_17503: {
         Args: { p_restaurant_id: string; p_staff_id: string }
         Returns: boolean
       }
@@ -5066,7 +5232,26 @@ export type Database = {
         }
         Returns: undefined
       }
+      admin_update_order_status_secured_impl_17505: {
+        Args: {
+          p_new_status: string
+          p_order_id: string
+          p_restaurant_id: string
+        }
+        Returns: undefined
+      }
       admin_update_restaurant_settings: {
+        Args: {
+          p_prep_time_minutes: number
+          p_primary_color: string
+          p_restaurant_id: string
+          p_service_fee_enabled: boolean
+          p_service_fee_percentage: number
+          p_target_cmv_percentage: number
+        }
+        Returns: undefined
+      }
+      admin_update_restaurant_settings_secured_impl_17506: {
         Args: {
           p_prep_time_minutes: number
           p_primary_color: string
@@ -5094,7 +5279,29 @@ export type Database = {
         Args: { p_field: string; p_restaurant_id: string; p_value?: string }
         Returns: undefined
       }
+      admin_upsert_payment_config_secured_impl_17509: {
+        Args: { p_field: string; p_restaurant_id: string; p_value?: string }
+        Returns: undefined
+      }
       admin_upsert_point_terminal: {
+        Args: {
+          p_configured_by?: string
+          p_device_id: string
+          p_device_name?: string
+          p_is_default_terminal?: boolean
+          p_mp_external_pos_id?: string
+          p_mp_external_store_id?: string
+          p_mp_pos_id?: string
+          p_mp_store_id?: string
+          p_operating_mode?: string
+          p_restaurant_id: string
+          p_terminal_metadata?: Json
+          p_totem_id?: string
+          p_use_on_kiosk?: boolean
+        }
+        Returns: string
+      }
+      admin_upsert_point_terminal_secured_impl_17510: {
         Args: {
           p_configured_by?: string
           p_device_id: string
@@ -5139,6 +5346,32 @@ export type Database = {
             }
             Returns: string
           }
+      admin_upsert_staff_secured_impl_17511: {
+        Args: {
+          p_allowed_sections?: string
+          p_display_name?: string
+          p_id?: string
+          p_password_hash?: string
+          p_restaurant_id: string
+          p_role?: string
+          p_username?: string
+        }
+        Returns: string
+      }
+      admin_upsert_staff_secured_impl_17512: {
+        Args: {
+          p_allowed_sections?: string
+          p_can_manage_orders?: boolean
+          p_display_name?: string
+          p_id?: string
+          p_password_hash?: string
+          p_receives_order_notifications?: boolean
+          p_restaurant_id: string
+          p_role?: string
+          p_username?: string
+        }
+        Returns: string
+      }
       apply_loyalty: {
         Args: {
           p_cpf: string
@@ -5152,6 +5385,14 @@ export type Database = {
       auto_release_inactive_tables: { Args: never; Returns: undefined }
       check_bill_exists: { Args: { p_bill_id: string }; Returns: string }
       check_mp_token_expiry: {
+        Args: { p_restaurant_id: string }
+        Returns: {
+          expires_at: string
+          has_token: boolean
+          is_expired: boolean
+        }[]
+      }
+      check_mp_token_expiry_secured_impl_17516: {
         Args: { p_restaurant_id: string }
         Returns: {
           expires_at: string
@@ -5215,6 +5456,10 @@ export type Database = {
       current_restaurant_id: { Args: never; Returns: string }
       current_staff_id: { Args: never; Returns: string }
       current_staff_role: { Args: never; Returns: string }
+      customer_phone_taken: {
+        Args: { p_exclude_cpf?: string; p_phone: string }
+        Returns: boolean
+      }
       deduct_stock_for_order_item: {
         Args: { p_order_item_id: string }
         Returns: undefined
@@ -5227,6 +5472,21 @@ export type Database = {
       delete_saved_card: {
         Args: { p_cpf: string; p_id: string }
         Returns: boolean
+      }
+      get_active_bill: {
+        Args: { p_comanda_id?: string; p_table_id: string }
+        Returns: {
+          id: string
+          status: string
+        }[]
+      }
+      get_comanda_orders: {
+        Args: {
+          p_comanda_id?: string
+          p_customer_cpf?: string
+          p_table_id: string
+        }
+        Returns: Json
       }
       get_comanda_status: {
         Args: { p_cpf: string; p_table_id: string }
@@ -5494,12 +5754,33 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      list_reward_redemptions: {
+        Args: { p_cpf: string; p_program_id: string }
+        Returns: {
+          reward_id: string
+        }[]
+      }
+      record_reward_redemption: {
+        Args: {
+          p_cpf: string
+          p_order_id?: string
+          p_program_id: string
+          p_reward_id: string
+          p_trigger_value?: number
+        }
+        Returns: boolean
+      }
       redeem_coupon: { Args: { p_code: string }; Returns: boolean }
       release_polling_lock: { Args: { _key: string }; Returns: boolean }
       restore_stock_for_order_item: {
         Args: { p_order_item_id: string; p_restaurant_id: string }
         Returns: undefined
       }
+      restore_stock_for_order_item_secured_impl_17539: {
+        Args: { p_order_item_id: string; p_restaurant_id: string }
+        Returns: undefined
+      }
+      table_has_activity: { Args: { p_table_id: string }; Returns: boolean }
       trigger_ifood_polling_all: { Args: never; Returns: undefined }
       try_acquire_polling_lock: {
         Args: { _key: string; _owner?: string; _ttl_seconds?: number }
