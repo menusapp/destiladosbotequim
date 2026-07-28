@@ -17,10 +17,8 @@
  */
 
 const PUBLIC_DOMAIN = "menusapp.com.br";
-// Projeto do .env — não fixar a referência aqui (apontava para o projeto
-// antigo do Menu's SaaS, gerando prévias por uma edge function inexistente
-// neste projeto).
-const PREVIEW_FN_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/menu-link-preview`;
+const SUPABASE_PROJECT_REF = (import.meta.env.VITE_SUPABASE_PROJECT_ID as string) || "ksscrxwvslddfqxjxzlo";
+const PREVIEW_FN_BASE = `https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1/menu-link-preview`;
 
 function joinPath(base: string, extraPath?: string): string {
   if (!extraPath) return base;

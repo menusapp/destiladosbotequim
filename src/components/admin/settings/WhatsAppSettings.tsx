@@ -145,10 +145,7 @@ const OWNER_NOTIFICATION_DEFAULTS: Record<string, { label: string; icon: any; te
   },
 };
 
-// Projeto do .env — NUNCA fixar a URL aqui: o projeto antigo (Menu's SaaS)
-// ficou apontado no código e as chamadas de WhatsApp iam para o Supabase
-// errado, que não tem a config deste restaurante ("WhatsApp not configured").
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL as string) || "https://ksscrxwvslddfqxjxzlo.supabase.co";
 
 const WhatsAppSettings = ({ restaurantId }: { restaurantId: string }) => {
   const { toast } = useToast();
