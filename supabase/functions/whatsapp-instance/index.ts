@@ -247,16 +247,23 @@ Deno.serve(async (req) => {
           updateData.enabled = true;
         }
 
-        await supabase
+        // Persistir o estado é essencial: o envio e as notificações leem daqui.
+        // Antes o erro era engolido em silêncio — o painel mostrava "Conectado"
+        // (estado ao vivo) enquanto o banco ficava sem a linha.
+        const { error: upsertError } = await supabase
           .from('whatsapp_config')
           .upsert(updateData, { onConflict: 'restaurant_id' });
+        if (upsertError) {
+          console.error('[GET] Falha ao salvar whatsapp_config:', upsertError);
+        }
 
         return new Response(
           JSON.stringify({
             instance_name: resolvedName,
             status: normalizedStatus,
             state: instanceState,
-            config
+            config,
+            persist_error: upsertError?.message ?? null
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );

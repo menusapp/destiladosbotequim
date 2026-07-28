@@ -53,29 +53,6 @@ Deno.serve(async (req) => {
 
     const config = (configs || []).find((c: any) => c.enabled) || (configs || [])[0];
 
-    if (!config) {
-      return new Response(
-        JSON.stringify({ error: 'WhatsApp not configured for this restaurant' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!config.enabled) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'whatsapp_disabled', message: 'O WhatsApp está desativado para este restaurante. Reconecte em Configurações → Notificações WhatsApp.' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Evolution API usa 'open' para conectado; o normalizador grava 'connected',
-    // mas aceitamos ambos por segurança.
-    if (config.instance_status !== 'connected' && config.instance_status !== 'open') {
-      return new Response(
-        JSON.stringify({ success: false, error: 'not_connected', message: `A instância do WhatsApp não está conectada (status: ${config.instance_status || 'desconhecido'}). Abra Configurações → Notificações WhatsApp para reconectar.` }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
       console.error('[SEND] EVOLUTION_API_URL/EVOLUTION_API_KEY não configuradas');
       return new Response(
@@ -84,7 +61,74 @@ Deno.serve(async (req) => {
       );
     }
 
-    const instanceName = config.instance_name;
+    // O usuário pode ter conectado o WhatsApp sem que a linha de config tenha
+    // sido gravada (ou ela ficou desatualizada). Em vez de recusar de cara,
+    // confirmamos o estado AO VIVO na Evolution e auto-corrigimos o banco.
+    // Evolution usa 'open'; o normalizador grava 'connected' — aceitamos os dois.
+    const dbConnected =
+      !!config?.enabled &&
+      (config.instance_status === 'connected' || config.instance_status === 'open');
+
+    let instanceName: string | null = dbConnected ? (config.instance_name || null) : null;
+
+    if (!instanceName) {
+      const { data: restaurant } = await supabase
+        .from('restaurants')
+        .select('slug')
+        .eq('id', restaurantId)
+        .maybeSingle();
+
+      // Mesma convenção de nomes usada pelo whatsapp-instance.
+      const candidates = [...new Set([
+        config?.instance_name,
+        restaurant?.slug ? `rest-${restaurant.slug}` : null,
+        `rest-${restaurantId.slice(0, 8)}`,
+      ].filter(Boolean) as string[])];
+
+      let liveState = 'unknown';
+      for (const name of candidates) {
+        try {
+          const res = await fetch(`${EVOLUTION_API_URL}/instance/connectionState/${name}`, {
+            headers: { 'apikey': EVOLUTION_API_KEY! }
+          });
+          if (!res.ok) continue;
+          const data = await res.json();
+          const state = data.instance?.state || data.state || 'unknown';
+          liveState = state;
+          if (state === 'open' || state === 'connected') {
+            instanceName = name;
+            break;
+          }
+        } catch { /* tenta o próximo nome */ }
+      }
+
+      if (instanceName) {
+        // Auto-corrige a config para os próximos envios (e para o painel).
+        const { error: healError } = await supabase
+          .from('whatsapp_config')
+          .upsert({
+            restaurant_id: restaurantId,
+            instance_name: instanceName,
+            instance_status: 'connected',
+            enabled: true,
+            connected_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'restaurant_id' });
+        if (healError) console.error('[SEND] Falha ao auto-corrigir whatsapp_config:', healError);
+        else console.log(`[SEND] whatsapp_config auto-corrigida (instância ${instanceName})`);
+      } else {
+        console.warn(`[SEND] Nenhuma instância conectada. Tentados: ${candidates.join(', ')} — estado: ${liveState}`);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'not_connected',
+            message: `A instância do WhatsApp não está conectada (estado: ${liveState}). Abra Configurações → Notificações WhatsApp e reconecte lendo o QR Code.`,
+            tried: candidates,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
     // Format phone number (remove non-digits, ensure country code)
     let formattedPhone = phone.replace(/\D/g, '');

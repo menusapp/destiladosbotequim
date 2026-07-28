@@ -41,8 +41,11 @@ Deno.serve(async (req) => {
       .eq('restaurant_id', restaurant_id)
       .maybeSingle();
 
-    const waConnected = waConfig?.instance_status === 'connected' || waConfig?.instance_status === 'open';
-    if (!waConfig?.enabled || !waConnected) {
+    // Só barramos quando o dono DESLIGOU explicitamente. Se a linha de config
+    // estiver ausente/desatualizada, seguimos: o whatsapp-send confere o estado
+    // ao vivo na Evolution, auto-corrige o banco e decide. Antes, um banco
+    // desatualizado silenciava todas as notificações mesmo conectado.
+    if (waConfig && waConfig.enabled === false) {
       return new Response(
         JSON.stringify({ success: false, reason: 'whatsapp_not_connected' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
