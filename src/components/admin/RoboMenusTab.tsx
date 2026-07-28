@@ -137,7 +137,7 @@ const RoboMenusTab = ({ restaurantId }: RoboMenusTabProps) => {
       }
 
       try {
-        const statusRes = await fetch(`https://nrddbsudiphrvgfneqle.supabase.co/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`);
+        const statusRes = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-instance?restaurantId=${restaurantId}`);
         const statusData = await statusRes.json();
         setWhatsappConnected(statusData.status === 'connected');
       } catch {

@@ -17,7 +17,7 @@
  */
 
 const PUBLIC_DOMAIN = "menusapp.com.br";
-const SUPABASE_PROJECT_REF = "nrddbsudiphrvgfneqle";
+const SUPABASE_PROJECT_REF = (import.meta.env.VITE_SUPABASE_PROJECT_ID as string) || "ksscrxwvslddfqxjxzlo";
 const PREVIEW_FN_BASE = `https://${SUPABASE_PROJECT_REF}.supabase.co/functions/v1/menu-link-preview`;
 
 function joinPath(base: string, extraPath?: string): string {
