@@ -905,7 +905,10 @@ export type Database = {
           cart_items: Json | null
           cart_value: number | null
           checkout_step: string | null
+          coupon_code: string | null
           created_at: string | null
+          delivery_address: string | null
+          delivery_type: string | null
           id: string
           last_activity: string | null
           name: string | null
@@ -919,7 +922,10 @@ export type Database = {
           cart_items?: Json | null
           cart_value?: number | null
           checkout_step?: string | null
+          coupon_code?: string | null
           created_at?: string | null
+          delivery_address?: string | null
+          delivery_type?: string | null
           id?: string
           last_activity?: string | null
           name?: string | null
@@ -933,7 +939,10 @@ export type Database = {
           cart_items?: Json | null
           cart_value?: number | null
           checkout_step?: string | null
+          coupon_code?: string | null
           created_at?: string | null
+          delivery_address?: string | null
+          delivery_type?: string | null
           id?: string
           last_activity?: string | null
           name?: string | null
