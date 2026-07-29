@@ -5769,6 +5769,14 @@ export type Database = {
           reward_id: string
         }[]
       }
+      order_in_default_restaurant: {
+        Args: { p_order_id: string }
+        Returns: boolean
+      }
+      order_item_in_default_restaurant: {
+        Args: { p_order_item_id: string }
+        Returns: boolean
+      }
       record_reward_redemption: {
         Args: {
           p_cpf: string
