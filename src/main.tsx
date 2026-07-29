@@ -7,6 +7,11 @@ import { installProductionLogSilencer } from "./lib/logger";
 // Em dev/preview, todos os logs continuam funcionando normalmente.
 installProductionLogSilencer();
 
+// Corrige a tela "bugada" no celular ao digitar no checkout (faixa em branco /
+// campos deslocados quando o teclado abre/fecha em drawers e dialogs).
+import { installMobileKeyboardFix } from "./lib/mobileKeyboardFix";
+installMobileKeyboardFix();
+
 // Side-effect import: registra window.testQzTrayConnection para teste via DevTools.
 // NÃO altera o fluxo de impressão atual.
 import "./lib/qzTrayTest";
