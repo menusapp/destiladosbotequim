@@ -707,7 +707,132 @@ const RestaurantAdmin = () => {
       })
       .subscribe();
 
+    // ------------------------------------------------------------------
+    // VIGIA POR POLLING: no modelo de sessão por token, o Realtime não
+    // recebe eventos de tabelas protegidas por RLS (o token não trafega no
+    // websocket) — por isso o pop-up + som de pedido novo pararam. Este
+    // vigia consulta a cada 10s e alimenta o MESMO fluxo de notificação
+    // dos canais acima. A deduplicação (notifiedOrdersRef/notifiedBillsRef/
+    // notifiedReservationsRef) garante que canais e polling coexistam sem
+    // avisar duas vezes.
+    // ------------------------------------------------------------------
+    const handleNewBillNotification = async (bill: any) => {
+      const billId = bill.id;
+      if (notifiedBillsRef.current.has(billId)) return;
+      if (bill.status !== 'requested') return;
+
+      const { data: tableData } = await supabase
+        .from('tables')
+        .select('restaurant_id, table_number')
+        .eq('id', bill.table_id)
+        .maybeSingle();
+      if (tableData?.restaurant_id !== restaurantId) return;
+
+      let customerName = 'Cliente';
+      if (bill.comanda_id) {
+        const { data: comandaData } = await supabase
+          .from('comandas')
+          .select('customer_name')
+          .eq('id', bill.comanda_id)
+          .maybeSingle();
+        if (comandaData?.customer_name) customerName = comandaData.customer_name;
+      } else {
+        const { data: comandaData } = await supabase
+          .from('comandas')
+          .select('customer_name')
+          .eq('table_id', bill.table_id)
+          .eq('status', 'active')
+          .maybeSingle();
+        if (comandaData?.customer_name) customerName = comandaData.customer_name;
+      }
+
+      setBillNotificationQueue(prev => {
+        if (prev.some(b => b.billId === billId)) return prev;
+        return [...prev, {
+          billId,
+          tableNumber: tableData.table_number,
+          total: bill.total_amount,
+          customerName,
+        }];
+      });
+
+      const updatedBills = new Set(notifiedBillsRef.current);
+      updatedBills.add(billId);
+      notifiedBillsRef.current = updatedBills;
+      setNotifiedBills(updatedBills);
+      if (activeSectionRef.current !== 'pedidos') setHasNewBills(true);
+    };
+
+    let notificationPollBusy = false;
+    const pollForNotifications = async () => {
+      if (notificationPollBusy || document.visibilityState !== 'visible') return;
+      notificationPollBusy = true;
+      try {
+        const sinceISO = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+        // Pedidos novos — o handler aplica as mesmas regras/dedup do canal.
+        const { data: recentOrders } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('restaurant_id', restaurantId)
+          .in('status', ['pending', 'accepted', 'preparing'])
+          .gte('created_at', sinceISO)
+          .order('created_at', { ascending: true });
+        for (const o of recentOrders || []) {
+          if (!notifiedOrdersRef.current.has(o.id)) {
+            await handleNewOrderNotification(o);
+          }
+        }
+
+        // Contas solicitadas na mesa.
+        const { data: recentBills } = await supabase
+          .from('bills')
+          .select('*')
+          .eq('status', 'requested')
+          .gte('created_at', sinceISO);
+        for (const b of recentBills || []) {
+          await handleNewBillNotification(b);
+        }
+
+        // Reservas pendentes (notificação é única — uma por vez).
+        const { data: recentReservations } = await supabase
+          .from('reservations')
+          .select('*')
+          .eq('restaurant_id', restaurantId)
+          .eq('status', 'pending')
+          .gte('created_at', sinceISO);
+        for (const r of recentReservations || []) {
+          if (notifiedReservationsRef.current.has(r.id)) continue;
+          const { data: tableData } = await supabase
+            .from('tables')
+            .select('table_name, table_number')
+            .eq('id', r.table_id)
+            .maybeSingle();
+          setReservationNotification({
+            reservationId: r.id,
+            customerName: r.customer_name,
+            tableName: tableData?.table_name || `Mesa ${tableData?.table_number || '?'}`,
+            date: r.reservation_date,
+            time: r.reservation_time,
+            partySize: r.party_size,
+          });
+          const updatedRes = new Set(notifiedReservationsRef.current);
+          updatedRes.add(r.id);
+          notifiedReservationsRef.current = updatedRes;
+          setNotifiedReservations(updatedRes);
+          break;
+        }
+      } catch (e) {
+        console.warn('[notification-poll] erro:', e);
+      } finally {
+        notificationPollBusy = false;
+      }
+    };
+    pollForNotifications();
+    const notificationPollTimer = setInterval(pollForNotifications, 10000);
+
     return () => {
+      clearInterval(notificationPollTimer);
       supabase.removeChannel(ordersChannel);
       supabase.removeChannel(billsChannel);
       supabase.removeChannel(reservationsChannel);
