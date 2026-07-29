@@ -60,14 +60,27 @@ Deno.serve(async (req) => {
       .eq('notification_type', notification_type)
       .maybeSingle();
 
-    if (!notifConfig || !notifConfig.is_active) {
+    // Só respeita o DESLIGADO explícito do dono. Linha ausente (restaurante
+    // criado depois dos seeds) NÃO pode silenciar as mensagens — usa o
+    // template padrão. Antes: sem linha → 'notification_disabled' → nenhuma
+    // mensagem de status saía, mesmo com o WhatsApp conectado.
+    if (notifConfig && notifConfig.is_active === false) {
       return new Response(
         JSON.stringify({ success: false, reason: 'notification_disabled' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const template = notifConfig.template_message;
+    const DEFAULT_TEMPLATES: Record<string, string> = {
+      order_accepted: '✅ Olá {{nome}}! Seu pedido foi aceito e está sendo preparado.\n\n{{resumo_pedido}}\n\n⏱️ Tempo estimado: {{tempo_estimado}} minutos.',
+      order_preparing: '👨‍🍳 Olá {{nome}}! Seu pedido #{{numero_pedido}} está em preparo!\n\n⏱️ Tempo estimado: {{tempo_estimado}} minutos.',
+      order_out_for_delivery: '🚗 Olá {{nome}}! Seu pedido #{{numero_pedido}} saiu para entrega / está pronto para retirada!',
+      order_ready_pickup: '📦 Olá {{nome}}! Seu pedido #{{numero_pedido}} está pronto para retirada! Aguardamos você! 😊',
+      order_cancelled: '❌ Olá {{nome}}, infelizmente seu pedido #{{numero_pedido}} foi cancelado. Motivo: {{motivo}}',
+      order_delivered: '🎉 Pedido #{{numero_pedido}} finalizado! Obrigado, {{nome}}! Avalie sua experiência: {{link_avaliacao}}',
+    };
+
+    const template = notifConfig?.template_message || DEFAULT_TEMPLATES[notification_type];
     if (!template) {
       return new Response(
         JSON.stringify({ success: false, reason: 'no_template' }),

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { resolveSlug } from "@/lib/slugResolver";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,6 +72,20 @@ const getStatusConfig = (status: string, deliveryType?: string) => {
       description: "Seu pedido foi aceito e está sendo preparado!",
       color: "bg-blue-500",
     },
+    // Aceitar = Preparando (um clique só): o cliente precisa ver "Em Preparo",
+    // não cair no fallback "Aguardando confirmação".
+    preparing: {
+      icon: Package,
+      label: "Em Preparo",
+      description: "Seu pedido foi aceito e está sendo preparado!",
+      color: "bg-blue-500",
+    },
+    ready: {
+      icon: Package,
+      label: "Pronto",
+      description: "Seu pedido está pronto!",
+      color: "bg-indigo-500",
+    },
     out_for_delivery: {
       icon: deliveryType === "pickup" ? Package : Truck,
       label: deliveryType === "pickup" ? "Pronto para Retirada" : "Saiu para Entrega",
@@ -114,11 +128,24 @@ export default function OrderConfirmation() {
 
   useDynamicFavicon(restaurant?.logo_url, restaurant?.name);
 
+  // Status visto por último — ref (não closure) para o intervalo de polling
+  // comparar sempre com o valor atual e disparar o aviso só na MUDANÇA.
+  const lastSeenStatusRef = useRef<string | null>(null);
+
+  // A RPC devolve `items`; as telas esperam `order_items` (com products/extras).
+  // Normaliza aceitando os dois formatos (compatível com a RPC antiga e nova).
+  const normalizeOrder = (data: any) => ({
+    ...data,
+    order_items: data.order_items ?? data.items ?? [],
+  });
+
   useEffect(() => {
     fetchOrderDetails();
+    // "Realtime" do cliente via polling curto: o websocket não autentica no
+    // modelo de sessão por token, então acompanhamos o pedido a cada 5s.
     const interval = setInterval(() => {
       pollOrderUpdates();
-    }, 15000);
+    }, 5000);
     return () => clearInterval(interval);
   }, [orderId]);
 
@@ -131,7 +158,8 @@ export default function OrderConfirmation() {
 
       if (orderError) throw orderError;
       if (!orderData) throw new Error("Order not found");
-      setOrder(orderData as any);
+      lastSeenStatusRef.current = orderData.status ?? null;
+      setOrder(normalizeOrder(orderData) as any);
 
       // Buscar dados do restaurante usando restaurant_id direto do pedido
       const { data: restaurantData, error: restaurantError } = await supabase
@@ -186,7 +214,9 @@ export default function OrderConfirmation() {
 
   const pollOrderUpdates = async () => {
     if (!orderId) return;
-    const previousStatus = order?.status;
+    // Ref em vez de closure: o setInterval guarda a primeira versão desta
+    // função, então `order?.status` ficaria congelado e o aviso repetiria.
+    const previousStatus = lastSeenStatusRef.current;
 
     const { data: fullOrder } = await (supabase as any).rpc("get_order_details", {
       p_order_id: orderId,
@@ -197,12 +227,13 @@ export default function OrderConfirmation() {
     const newStatus = fullOrder.status;
     const deliveryType = fullOrder.delivery_type;
 
-    setOrder(fullOrder as any);
+    lastSeenStatusRef.current = newStatus ?? null;
+    setOrder(normalizeOrder(fullOrder) as any);
 
     if (newStatus === previousStatus) return;
 
-    // Notificações de mudança de status
-    if (newStatus === "accepted") {
+    // Notificações de mudança de status (accepted e preparing = mesmo passo)
+    if (newStatus === "accepted" || newStatus === "preparing") {
       toast.success("Seu pedido foi aceito e está em preparo! 🎉");
     } else if (newStatus === "out_for_delivery") {
       toast.success(

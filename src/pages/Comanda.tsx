@@ -250,7 +250,8 @@ const Comanda = () => {
       fetchData();
     };
 
-    const pollInterval = setInterval(pollComandaStatus, 15000);
+    // 6s: "realtime" da mesa via polling (o websocket nao autentica no modelo de token)
+    const pollInterval = setInterval(pollComandaStatus, 6000);
     
     return () => {
       clearInterval(pollInterval);
